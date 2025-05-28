@@ -110,29 +110,29 @@ cluster_name = "c3g-dev-k8s"
 
 # Image variables, always use the ID.
 #   Get options with 'openstack image list'
-bastion_image = "IMAGE UUID"
-mgmt_image = "IMAGE UUID"
+bastion_image       = "IMAGE UUID"
+mgmt_image          = "IMAGE UUID"
 control_plane_image = "IMAGE UUID"
-worker_image = "IMAGE UUID"
+worker_image        = "IMAGE UUID"
 
 # Flavor variables, always use the ID.
 #   Get options with 'openstack flavor list'
-bastion_flavor = "FLAVOR UUID"         
-mgmt_flavor = "FLAVOR UUID"            
-control_plane_flavor = "FLAVOR UUID"   
-worker_flavor = "FLAVOR UUID"          
+bastion_flavor       = "FLAVOR UUID"
+mgmt_flavor          = "FLAVOR UUID"
+control_plane_flavor = "FLAVOR UUID"
+worker_flavor        = "FLAVOR UUID"
 
 # Volume sizes in GB.
-bastion_volume_size = 20
-mgmt_volume_size = 20
+bastion_volume_size       = 20
+mgmt_volume_size          = 20
 control_plane_volume_size = 50
-worker_volume_size = 50
+worker_volume_size        = 50
 
-# Volume types
-bastion_volume_type = "volumes-ssd"
-mgmt_volume_type = "volumes-ssd"
+# Volume types: volumes-ssd OR volumes-ec
+bastion_volume_type       = "volumes-ssd"
+mgmt_volume_type          = "volumes-ssd"
 control_plane_volume_type = "volumes-ssd"
-worker_volume_type = "volumes-ssd"
+worker_volume_type        = "volumes-ssd"
 
 # Instance counts
 control_plane_count = 3 # Default (3 or more for HA)
@@ -150,8 +150,7 @@ keypair = "YOUR KEYPAIR NAME"
 
 # Networking
 public_network_id = "PUBLIC NETWORK UUID"
-router_name = "ROUTER NAME"
-
+router_name       = "ROUTER NAME"
 ```
 
 ## Bastion config
