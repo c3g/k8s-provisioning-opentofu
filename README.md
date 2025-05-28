@@ -42,7 +42,14 @@ Using this template is as simple as this:
 ```bash
 # clone or fork this repo, then cd to it
 
+# Source the OpenStack RC file.
+# Make sure to use the file for the appropriate OpenStack project!!!
+# You will be prompted for your password
+source my-project-openrc.sh
+
+# (Optional but recommended)
 # Prepare the variables for the OpenTofu module
+# If you don't do this, OpenTofu will give you interactive prompts to provide values.
 cp terraform.tfvars.example terraform.tfvars
 
 # Modify the variables according to your needs
@@ -62,7 +69,54 @@ tofu plan
 tofu apply
 ```
 
-Assuming that apply went well, you now have all your VMs, networks, security groups and floating IP ready for the K8S bootstrap!
+Assuming that apply went well, you now have all your VMs, networks, 
+security groups and floating IP ready for the K8S bootstrap!
+
+### Configuration variables
+
+The `terraform.tfvars` file is auto discovered by OpenTofu when running `plan` and `apply`, 
+use it to provide the values to the required variables.
+
+```bash
+# Cluster name, will be the prefix to all OpenStack resources created.
+# Use a lower case hyphen-separated name for consistency
+cluster_name = "c3g-dev-k8s"
+
+# Image variables, always use the ID.
+#   Get options with 'openstack image list'
+bastion_image = "IMAGE UUID"
+mgmt_image = "IMAGE UUID"
+control_plane_image = "IMAGE UUID"
+worker_image = "IMAGE UUID"
+
+# Flavor variables, always use the ID.
+#   Get options with 'openstack flavor list'
+bastion_flavor = "FLAVOR UUID"         # ha2-2.5gb
+mgmt_flavor = "FLAVOR UUID"            # ha2-2.5gb
+control_plane_flavor = "FLAVOR UUID"   # ha8-10gb
+worker_flavor = "FLAVOR UUID"          # ha8-10gb
+
+# Volume sizes in GB.
+bastion_volume_size = 20
+mgmt_volume_size = 20
+control_plane_volume_size = 50
+worker_volume_size = 50
+
+# Volume types
+bastion_volume_type = "volumes-ssd"
+mgmt_volume_type = "volumes-ssd"
+control_plane_volume_type = "volumes-ssd"
+worker_volume_type = "volumes-ssd"
+
+# OpenStack keypair
+#   Get valid options with 'openstack keypair list'
+keypair = "YOUR KEYPAIR NAME"
+
+# Networking
+public_network_id = "PUBLIC NETWORK UUID"
+router_name = "ROUTER NAME"
+
+```
 
 ## Kubernetes bootstrap
 
