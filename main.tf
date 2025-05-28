@@ -8,12 +8,13 @@ terraform {
   }
   backend "s3" {
     bucket = "fried_tofu"
-    key = "${var.cluster_name}"
+    key    = var.cluster_name
     region = "us-east-1"
     endpoints = {
       s3 = "${var.s3_endpoint}"
     }
-    skip_requesting_account_id = true
+    # Skip validations that fail with Ceph S3
+    skip_requesting_account_id  = true
     skip_credentials_validation = true
     # NOTE: requires AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY to be loaded in env vars
   }
@@ -39,8 +40,8 @@ variable "cluster_name" {
 # See https://opentofu.org/docs/language/settings/backends/s3/
 variable "s3_endpoint" {
   description = "S3 endpoint to use for backend storage."
-  type = string
-  default = "https://objets.juno.calculquebec.ca"
+  type        = string
+  default     = "https://objets.juno.calculquebec.ca"
 }
 
 # Openstack keypair to use
@@ -89,6 +90,19 @@ variable "control_plane_flavor" {
 variable "worker_flavor" {
   description = "K8S worker flavor"
   type        = string
+}
+
+# K8S nodes counts
+variable "control_plane_count" {
+  description = "The number of control plane nodes to create"
+  type = number
+  default = 3
+}
+
+variable "worker_count" {
+  description = "The number of worker nodes to create"
+  type = number
+  default = 3
 }
 
 # Volume sizes & types
@@ -145,22 +159,22 @@ variable "router_name" {
 # User data
 variable "bastion_user_data_path" {
   description = "Path to the Cloud-Init file for Bastion setup"
-  type = string
+  type        = string
 }
 
 variable "mgmt_user_data_path" {
   description = "Path to the Cloud-Init file for MGMT VM"
-  type = string
+  type        = string
 }
 
 variable "cp_user_data_path" {
   description = "(Optional) Path to the Cloud-Init file for Control-Plane VMs"
-  type = string
+  type        = string
 }
 
 variable "worker_user_data_path" {
   description = "(Optional) Path to the Cloud-Init file for Control-Plane VMs"
-  type = string
+  type        = string
 }
 
 ######### NETWORKING
@@ -188,7 +202,7 @@ resource "openstack_networking_router_interface_v2" "mgmt_router_interface" {
 }
 
 resource "openstack_networking_port_v2" "bastion_port" {
-  network_id = openstack_networking_network_v2.mgmt_net.id
+  network_id         = openstack_networking_network_v2.mgmt_net.id
   security_group_ids = [openstack_networking_secgroup_v2.bastion_sg.id]
   fixed_ip {
     subnet_id = openstack_networking_subnet_v2.mgmt_subnet.id
@@ -295,8 +309,9 @@ resource "openstack_networking_secgroup_rule_v2" "cp_from_mgmt" {
   direction         = "ingress"
   ethertype         = "IPv4"
   protocol          = "tcp"
-  port_range_min    = 1
-  port_range_max    = 65535
+  # 0 for min and max allows all trafic to the control-plane network from the mgmt security group
+  port_range_min    = 0
+  port_range_max    = 0
   remote_group_id   = openstack_networking_secgroup_v2.mgmt_sg.id
   security_group_id = openstack_networking_secgroup_v2.cp_sg.id
 }
@@ -306,8 +321,9 @@ resource "openstack_networking_secgroup_rule_v2" "worker_from_mgmt" {
   direction         = "ingress"
   ethertype         = "IPv4"
   protocol          = "tcp"
-  port_range_min    = 1
-  port_range_max    = 65535
+  # 0 for min and max allows all trafic to the worker network from the mgmt security group
+  port_range_min    = 0
+  port_range_max    = 0
   remote_group_id   = openstack_networking_secgroup_v2.mgmt_sg.id
   security_group_id = openstack_networking_secgroup_v2.worker_sg.id
 }
@@ -365,13 +381,13 @@ resource "openstack_compute_instance_v2" "mgmt" {
     boot_index            = 0
     delete_on_termination = true
   }
-  user_data = file("${var.mgmt_user_data_path}")
+  user_data  = file("${var.mgmt_user_data_path}")
   depends_on = [openstack_networking_subnet_v2.mgmt_subnet]
 }
 
 # Control plane VMs
 resource "openstack_compute_instance_v2" "control_plane" {
-  count           = 3
+  count           = var.control_plane_count
   name            = "${var.cluster_name}-cp-${count.index + 1}"
   flavor_id       = var.control_plane_flavor
   key_pair        = var.keypair
@@ -388,13 +404,13 @@ resource "openstack_compute_instance_v2" "control_plane" {
     boot_index            = 0
     delete_on_termination = true
   }
-  user_data = file("${var.cp_user_data_path}")
-  depends_on = [ openstack_networking_network_v2.cp_net ]
+  user_data  = file("${var.cp_user_data_path}")
+  depends_on = [openstack_networking_network_v2.cp_net]
 }
 
 # Worker VMs
 resource "openstack_compute_instance_v2" "worker" {
-  count           = 3
+  count           = var.worker_count
   name            = "${var.cluster_name}-worker-${count.index + 1}"
   flavor_id       = var.worker_flavor
   key_pair        = var.keypair
@@ -411,6 +427,6 @@ resource "openstack_compute_instance_v2" "worker" {
     boot_index            = 0
     delete_on_termination = true
   }
-  user_data = file("${var.worker_user_data_path}")
-  depends_on = [ openstack_networking_network_v2.worker_net ]
+  user_data  = file("${var.worker_user_data_path}")
+  depends_on = [openstack_networking_network_v2.worker_net]
 }

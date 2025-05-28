@@ -11,10 +11,10 @@ worker_image = "IMAGE UUID"
 
 # Flavor variables, always use the ID.
 #   Get options with 'openstack flavor list'
-bastion_flavor = "FLAVOR UUID"         # ha2-2.5gb
-mgmt_flavor = "FLAVOR UUID"            # ha2-2.5gb
-control_plane_flavor = "FLAVOR UUID"   # ha8-10gb
-worker_flavor = "FLAVOR UUID"          # ha8-10gb
+bastion_flavor = "FLAVOR UUID"         
+mgmt_flavor = "FLAVOR UUID"            
+control_plane_flavor = "FLAVOR UUID"   
+worker_flavor = "FLAVOR UUID"          
 
 # Volume sizes in GB.
 bastion_volume_size = 20
@@ -22,11 +22,21 @@ mgmt_volume_size = 20
 control_plane_volume_size = 50
 worker_volume_size = 50
 
-# Volume types
+# Volume types: volumes-ssd OR volumes-ec
 bastion_volume_type = "volumes-ssd"
 mgmt_volume_type = "volumes-ssd"
 control_plane_volume_type = "volumes-ssd"
 worker_volume_type = "volumes-ssd"
+
+# Instance counts
+control_plane_count = 3 # Default (3 or more for HA)
+worker_count        = 3 # Default (3 or more for HA)
+
+# Cloud-Init (User data)
+bastion_user_data_path = "userdata/bastion.yaml"
+mgmt_user_data_path    = "userdata/mgmt.yaml"
+cp_user_data_path      = "userdata/k8s-master.yaml"
+worker_user_data_path  = "userdata/k8s-worker.yaml"
 
 # OpenStack keypair
 #   Get valid options with 'openstack keypair list'

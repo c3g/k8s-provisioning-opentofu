@@ -134,6 +134,16 @@ mgmt_volume_type = "volumes-ssd"
 control_plane_volume_type = "volumes-ssd"
 worker_volume_type = "volumes-ssd"
 
+# Instance counts
+control_plane_count = 3 # Default (3 or more for HA)
+worker_count        = 3 # Default (3 or more for HA)
+
+# Cloud-Init (User data)
+bastion_user_data_path = "userdata/bastion.yaml"
+mgmt_user_data_path    = "userdata/mgmt.yaml"
+cp_user_data_path      = "userdata/k8s-master.yaml"
+worker_user_data_path  = "userdata/k8s-worker.yaml"
+
 # OpenStack keypair
 #   Get valid options with 'openstack keypair list'
 keypair = "YOUR KEYPAIR NAME"
@@ -143,6 +153,49 @@ public_network_id = "PUBLIC NETWORK UUID"
 router_name = "ROUTER NAME"
 
 ```
+
+## Bastion config
+
+After a succesful `tofu apply`, you should be able to SSH to the bastion VM.
+There, follow the [installation instructions](https://ovh.github.io/the-bastion/installation/basic.html) for 
+OVH's The-Bastion.
+
+In the Bastion, create a group for the Kubernetes admins, add the required users to that group.
+Get the egress key for the group, this is a public SSH key that needs to be added to the management VM.
+
+To add the key to the management VM, edit the `./userdata/mgmt.yaml` file and add the egress key to the 'bastion' user:
+
+```yaml
+#cloud-config
+users:
+  # ... don't touch the other users, just update 'bastion'
+  - name: bastion
+    groups: adm, wheel, systemd-journal
+    selinux_user: unconfined_u
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys: [
+      # ADD BASTION GROUP'S EGRESS KEY HERE!!!
+      YOUR-BASTION-GROUP-EGRESS-KEY,
+    ]
+```
+
+Changing this value will result in the management VM being fully replaced, so only do this once.
+
+Review the plan and apply it if it looks good:
+
+```bash
+# Review plan
+tofu plan
+
+# Apply the changes
+tofu apply
+```
+
+Now we can add the management VM to the list of servers belonging to the Bastion group:
+1. SSH into bastion with the alias (`bssh` by default).
+2. Use the `groupAddServer` command to add the management server to the group.
+
+At this point, the users in the group can connect to the management VM via bastion, and bootstrap the K8S cluster!
 
 ## Kubernetes bootstrap
 
