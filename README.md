@@ -159,8 +159,12 @@ After a succesful `tofu apply`, you should be able to SSH to the bastion VM.
 There, follow the [installation instructions](https://ovh.github.io/the-bastion/installation/basic.html) for 
 OVH's The-Bastion.
 
-In the Bastion, create a group for the Kubernetes admins, add the required users to that group.
-Get the egress key for the group, this is a public SSH key that needs to be added to the management VM.
+In the Bastion: 
+- [Create a group](https://ovh.github.io/the-bastion/plugins/restricted/groupCreate.html#groupcreate) for the Kubernetes admins, add the required users to that group.
+- [Create an account](https://ovh.github.io/the-bastion/plugins/restricted/accountCreate.html) for each K8S manager.
+- [Add the accounts to the group](https://ovh.github.io/the-bastion/plugins/group-gatekeeper/groupAddMember.html#groupaddmember)
+- [Get the egress key for the group you created](https://ovh.github.io/the-bastion/plugins/open/groupInfo.html)
+  - This is a public SSH key that needs to be added to the management VM
 
 To add the key to the management VM, edit the `./userdata/mgmt.yaml` file and add the egress key to the 'bastion' user:
 
@@ -193,6 +197,10 @@ tofu apply
 Now we can add the management VM to the list of servers belonging to the Bastion group:
 1. SSH into bastion with the alias (`bssh` by default).
 2. Use the `groupAddServer` command to add the management server to the group.
+```bash
+# In Bastion:
+groupAddServer --group <your group> --host <mgmt VM IP on the mgmt network> --user bastion --port 22
+```
 
 At this point, the users in the group can connect to the management VM via bastion, and bootstrap the K8S cluster!
 
