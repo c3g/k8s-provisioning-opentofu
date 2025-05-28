@@ -1,0 +1,36 @@
+#cloud-config
+packages:
+  - git
+  - vim
+  - syslog-ng
+  - wget
+  - net-tools
+
+# package_update: true
+# package_upgrade: true
+# package_reboot_if_required: true
+
+users:
+  - name: admin
+    groups: adm, wheel, systemd-journal
+    selinux_user: unconfined_u
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys: [
+      ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKNh8QVIYdqgnPK1jS2slJ7Xmcz3eEfqGRaSKqKK3gSF poq@frugal,
+      ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGxum9RRpQUxPaSL5FJP/bXM0P4vs23EuMkJoXvA5TV6 victor.rocheleau@mcgill.ca,
+      ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPjXNvynxihSsSiEQYK2wfSNWA6SdUFFylOx1CZUPXCu victor.rocheleau@mcgill.ca
+    ]
+
+# Install only, produces a Bastion config that needs to be validated before starting Bastion
+# runcmd:
+#   - sudo su
+#   - git clone https://github.com/ovh/the-bastion /opt/bastion
+#   - git -C /opt/bastion checkout $(git -C /opt/bastion tag | tail -1)
+#   - /opt/bastion/bin/admin/packages-check.sh -i
+#   - /opt/bastion/bin/admin/install-ttyrec.sh -a
+#   - /opt/bastion/bin/admin/install --new-install
+
+
+disable_ec2_metadata: false
+timezone: "UTC-5" # EST
+fqdn: bastion.staging.pcgl.sd4h.ca
