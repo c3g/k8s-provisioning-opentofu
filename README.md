@@ -117,10 +117,10 @@ worker_image = "IMAGE UUID"
 
 # Flavor variables, always use the ID.
 #   Get options with 'openstack flavor list'
-bastion_flavor = "FLAVOR UUID"         # ha2-2.5gb
-mgmt_flavor = "FLAVOR UUID"            # ha2-2.5gb
-control_plane_flavor = "FLAVOR UUID"   # ha8-10gb
-worker_flavor = "FLAVOR UUID"          # ha8-10gb
+bastion_flavor = "FLAVOR UUID"         
+mgmt_flavor = "FLAVOR UUID"            
+control_plane_flavor = "FLAVOR UUID"   
+worker_flavor = "FLAVOR UUID"          
 
 # Volume sizes in GB.
 bastion_volume_size = 20
