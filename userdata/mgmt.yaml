@@ -4,6 +4,12 @@ users:
     groups: adm, wheel, systemd-journal
     selinux_user: unconfined_u
     sudo: ALL=(ALL) NOPASSWD:ALL
+    # Always include some admin keys so we can bootstrap the VM with Bastion
     ssh_authorized_keys: [
-      # TODO: add Bastion key once setup
+      ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKNh8QVIYdqgnPK1jS2slJ7Xmcz3eEfqGRaSKqKK3gSF poq@frugal,
+      ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGxum9RRpQUxPaSL5FJP/bXM0P4vs23EuMkJoXvA5TV6 victor.rocheleau@mcgill.ca,
+      ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPjXNvynxihSsSiEQYK2wfSNWA6SdUFFylOx1CZUPXCu victor.rocheleau@mcgill.ca
     ]
+
+disable_ec2_metadata: false
+timezone: "UTC-5" # EST

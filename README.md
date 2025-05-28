@@ -25,15 +25,34 @@ Use this repository as a template to provision the resources needed for a secure
 Make sure you meet the requirements before using this repository:
 -   An OpenStack RC file you can source in your terminal
 -   Adequate OpenStack quotas for the resources you plan on creating
--   [OpenTofu](https://opentofu.org/docs/intro/install/)
+-   [OpenTofu CLI](https://opentofu.org/docs/intro/install/)
+-   An S3 bucket in your OpenStack project reserved for OpenTofu (e.g. "fried_tofu")
+-   S3 credentials valid for the bucket
 -   (Recommended) openstack CLI to get UUIDs and resource names
 
 ## What/Why OpenTofu?
 [OpenTofu](https://opentofu.org/) is a drop-in replacement for Terraform, it enables reliable and 
 flexible infrastructure as code on a number of providers, including OpenStack.
 
-Contrary to other Terraform compatible alternatives like Pulumi, OpenTofu is fully free, open-source and under the wing of the Linux Foundation, ensuring we won't need to spin on a dime if/when Terraform changes
-its license for the worst.
+Contrary to other Terraform compatible alternatives like Pulumi, OpenTofu is fully free, open-source and under the wing 
+of the Linux Foundation, ensuring we won't need to spin on a dime if/when Terraform changes its license for the worst.
+
+### Storage backend
+
+Read more on the OpenTofu [Backend config page](https://opentofu.org/docs/language/settings/backends/configuration/).
+This repo implements the [Remote State](https://opentofu.org/docs/language/state/remote/) backend using SD4H's S3 API.
+
+This state management strategy is more robust, especially when working in teams:
+> With remote state, OpenTofu writes the state data to a remote data store, which can then be shared between all members
+>  of a team. OpenTofu supports storing state in TACOS (TF Automation and Collaboration Software), HashiCorp Consul, 
+> Amazon S3, Azure Blob Storage, Google Cloud Storage, Alibaba Cloud OSS, and more.
+
+For usage on SD4H, the most convenient path is to use the provided S3 API!
+Before applying this module, make sure you have the following ready:
+1. Your OpenStack project has a private bucket dedicated to OpenTofu
+2. You have S3 credentials on that project
+   1. Find existing credentials with `openstack ec2 credentials create`, pay attention to the project ID
+   2. If you don't already have credentials for that project, generate them with `openstack ec2 credentials create`
 
 ## Usage
 
@@ -47,6 +66,13 @@ Using this template is as simple as this:
 # You will be prompted for your password
 source my-project-openrc.sh
 
+# List your S3 credentials
+openstack ec2 credentials list
+
+# Load the S3 credentials in env variables for security
+export AWS_ACCESS_KEY_ID=<ACCESS KEY VALUE FROM ABOVE>
+export AWS_SECRET_ACCESS_KEY=<SECRET KEY VALUE FROM ABOVE>
+
 # (Optional but recommended)
 # Prepare the variables for the OpenTofu module
 # If you don't do this, OpenTofu will give you interactive prompts to provide values.
@@ -54,7 +80,7 @@ cp terraform.tfvars.example terraform.tfvars
 
 # Modify the variables according to your needs
 #   code terraform.tfvars   # in VSCode
-#   vim terraform.tfvars   # in Vim
+#   vim terraform.tfvars    # in Vim
 
 # Init the OpenTofu directory
 tofu init

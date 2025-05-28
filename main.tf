@@ -6,6 +6,17 @@ terraform {
       version = "3.1.0"
     }
   }
+  backend "s3" {
+    bucket = "fried_tofu"
+    key = "${var.cluster_name}"
+    region = "us-east-1"
+    endpoints = {
+      s3 = "${var.s3_endpoint}"
+    }
+    skip_requesting_account_id = true
+    skip_credentials_validation = true
+    # NOTE: requires AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY to be loaded in env vars
+  }
 }
 
 # Configure the OpenStack Provider
@@ -18,9 +29,18 @@ provider "openstack" {
 
 ######### Variables
 
+# Cluster name
 variable "cluster_name" {
   description = "Resource name for the K8S cluster, will be the prefix to all OpenStack resources created."
   type        = string
+}
+
+# Storage backend
+# See https://opentofu.org/docs/language/settings/backends/s3/
+variable "s3_endpoint" {
+  description = "S3 endpoint to use for backend storage."
+  type = string
+  default = "https://objets.juno.calculquebec.ca"
 }
 
 # Openstack keypair to use
@@ -120,6 +140,27 @@ variable "public_network_id" {
 variable "router_name" {
   description = "OpenStack router name"
   type        = string
+}
+
+# User data
+variable "bastion_user_data_path" {
+  description = "Path to the Cloud-Init file for Bastion setup"
+  type = string
+}
+
+variable "mgmt_user_data_path" {
+  description = "Path to the Cloud-Init file for MGMT VM"
+  type = string
+}
+
+variable "cp_user_data_path" {
+  description = "(Optional) Path to the Cloud-Init file for Control-Plane VMs"
+  type = string
+}
+
+variable "worker_user_data_path" {
+  description = "(Optional) Path to the Cloud-Init file for Control-Plane VMs"
+  type = string
 }
 
 ######### NETWORKING
@@ -301,7 +342,8 @@ resource "openstack_compute_instance_v2" "bastion" {
     boot_index            = 0
     delete_on_termination = true
   }
-  user_data  = file("userdata/bastion.yaml") # TODO: path var
+  # user_data  = file("${var.bastion_user_data_path}")
+  user_data  = file(var.bastion_user_data_path)
   depends_on = [openstack_networking_subnet_v2.mgmt_subnet]
 }
 
@@ -323,6 +365,8 @@ resource "openstack_compute_instance_v2" "mgmt" {
     boot_index            = 0
     delete_on_termination = true
   }
+  user_data = file("${var.mgmt_user_data_path}")
+  depends_on = [openstack_networking_subnet_v2.mgmt_subnet]
 }
 
 # Control plane VMs
@@ -344,6 +388,8 @@ resource "openstack_compute_instance_v2" "control_plane" {
     boot_index            = 0
     delete_on_termination = true
   }
+  user_data = file("${var.cp_user_data_path}")
+  depends_on = [ openstack_networking_network_v2.cp_net ]
 }
 
 # Worker VMs
@@ -365,4 +411,6 @@ resource "openstack_compute_instance_v2" "worker" {
     boot_index            = 0
     delete_on_termination = true
   }
+  user_data = file("${var.worker_user_data_path}")
+  depends_on = [ openstack_networking_network_v2.worker_net ]
 }
