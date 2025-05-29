@@ -22,13 +22,13 @@ users:
     ]
 
 # Install only, produces a Bastion config that needs to be validated before starting Bastion
-# runcmd:
-#   - sudo su
-#   - git clone https://github.com/ovh/the-bastion /opt/bastion
-#   - git -C /opt/bastion checkout $(git -C /opt/bastion tag | tail -1)
-#   - /opt/bastion/bin/admin/packages-check.sh -i
-#   - /opt/bastion/bin/admin/install-ttyrec.sh -a
-#   - /opt/bastion/bin/admin/install --new-install
+runcmd:
+  - sudo su
+  - git clone https://github.com/ovh/the-bastion /opt/bastion
+  - git -C /opt/bastion checkout $(git -C /opt/bastion tag | tail -1)
+  - /opt/bastion/bin/admin/packages-check.sh -i
+  - /opt/bastion/bin/admin/install-ttyrec.sh -a
+  - /opt/bastion/bin/admin/install --new-install
 
 
 disable_ec2_metadata: false

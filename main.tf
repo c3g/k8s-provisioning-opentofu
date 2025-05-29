@@ -405,7 +405,7 @@ resource "openstack_compute_instance_v2" "control_plane" {
     delete_on_termination = true
   }
   user_data  = file("${var.cp_user_data_path}")
-  depends_on = [openstack_networking_network_v2.cp_net]
+  depends_on = [openstack_networking_subnet_v2.cp_subnet]
 }
 
 # Worker VMs
@@ -428,5 +428,5 @@ resource "openstack_compute_instance_v2" "worker" {
     delete_on_termination = true
   }
   user_data  = file("${var.worker_user_data_path}")
-  depends_on = [openstack_networking_network_v2.worker_net]
+  depends_on = [openstack_networking_subnet_v2.worker_subnet]
 }

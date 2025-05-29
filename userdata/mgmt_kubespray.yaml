@@ -1,0 +1,23 @@
+#cloud-config
+users:
+  - name: admin
+    groups: adm, wheel, systemd-journal
+    selinux_user: unconfined_u
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    # Good to include some keys for the admin so we can retrieve the instance if something goes wrong with bastion
+    ssh_authorized_keys: [
+      ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKNh8QVIYdqgnPK1jS2slJ7Xmcz3eEfqGRaSKqKK3gSF poq@frugal,
+      ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGxum9RRpQUxPaSL5FJP/bXM0P4vs23EuMkJoXvA5TV6 victor.rocheleau@mcgill.ca,
+      ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPjXNvynxihSsSiEQYK2wfSNWA6SdUFFylOx1CZUPXCu victor.rocheleau@mcgill.ca
+    ]
+  - name: bastion
+    groups: adm, wheel, systemd-journal
+    selinux_user: unconfined_u
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys: [
+      # ADD BASTION GROUP'S EGRESS KEY HERE!!!
+    ]
+
+
+disable_ec2_metadata: false
+timezone: "UTC-5" # EST
