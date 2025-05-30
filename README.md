@@ -28,16 +28,19 @@ Make sure you meet the requirements before using this repository:
 -   [OpenTofu CLI](https://opentofu.org/docs/intro/install/)
 -   An S3 bucket in your OpenStack project reserved for OpenTofu (e.g. "fried_tofu")
 -   S3 credentials valid for the bucket
--   (Recommended) openstack CLI to get UUIDs and resource names
+-   Openstack CLI to get UUIDs and resource names
+-   (Recommended) [jq](https://jqlang.org/) to parse JSON variables from OpenStack CLI
+-   (Recommended) aws CLI for advanced S3 operations
+    -   Why? The aws CLI has the best interfaces to manage versionned buckets
 
-## What/Why OpenTofu?
+### What/Why OpenTofu?
 [OpenTofu](https://opentofu.org/) is a drop-in replacement for Terraform, it enables reliable and 
 flexible infrastructure as code on a number of providers, including OpenStack.
 
 Contrary to other Terraform compatible alternatives like Pulumi, OpenTofu is fully free, open-source and under the wing 
 of the Linux Foundation, ensuring we won't need to spin on a dime if/when Terraform changes its license for the worst.
 
-### Storage backend
+### Storage backend configuration
 
 Read more on the OpenTofu [Backend config page](https://opentofu.org/docs/language/settings/backends/configuration/).
 This repo implements the [Remote State](https://opentofu.org/docs/language/state/remote/) backend using SD4H's S3 API.
@@ -49,29 +52,72 @@ This state management strategy is more robust, especially when working in teams:
 
 For usage on SD4H, the most convenient path is to use the provided S3 API!
 Before applying this module, make sure you have the following ready:
-1. Your OpenStack project has a private bucket dedicated to OpenTofu
+1. Your OpenStack project has a private bucket dedicated to OpenTofu, **with bucket versioning enabled**
+   1. Bucket versioning must be enabled with the S3 API, Swift will not work. (instructions bellow)
 2. You have S3 credentials on that project
-   1. Find existing credentials with `openstack ec2 credentials create`, pay attention to the project ID
+   1. Find existing credentials with `openstack ec2 credentials list`, pay attention to the project ID
    2. If you don't already have credentials for that project, generate them with `openstack ec2 credentials create`
+
+If you don't have the above, here is how to set it up quickly:
+
+```bash
+# Source the OpenStack RC file for your project
+source my-project-openrc.sh
+
+# Create S3 credentials for your user in the current project
+openstack ec2 credentials create
+
+# Create a local profile for your aws CLI for S3 operations on SD4H (change my-profile to the OpenStack project name)
+# This is needed to setup bucket versioning
+aws configure --profile=my-profile
+> AWS Access Key ID [None]: <COPY FROM ABOVE>
+> AWS Secret Access Key [None]: <COPY FROM ABOVE>
+> Default region name [None]: <LEAVE EMPTY>
+> Default output format [None]: json  
+
+# For convenience, make an alias that includes the SD4H object store endpoint
+alias aws-sd4h-my-profile="aws --profile my-profile --endpoint-url=https://objets.juno.calculquebec.ca"
+
+# Create a regular bucket for storage backend
+aws-sd4h-my-profile s3 mb s3://fried_tofu
+
+# Enable bucket versioning on the created bucket
+aws-sd4h-my-profile s3api put-bucket-versioning \
+  --bucket fried_tofu \
+  --versioning-configuration Status=Enabled
+
+# Verify versioning is enabled
+aws-sd4h-my-profile s3api get-bucket-versioning --bucket fried_tofu
+# Good to go if you get this in the response: { "Status" : "Enabled"}
+```
+
+Now, every time `tofu apply` is used, a new state version will be automatically uploaded to the S3 bucket we configured.
+This allows us to rollback to a previous state if needed. To get the list of state object versions:
+
+```bash
+aws-sd4h-my-profile s3api list-object-versions --bucket fried_tofu --prefix <cluster_name variable value>
+```
 
 ## Usage
 
-Using this template is as simple as this:
+With the S3 storage backend in place, using this template is as simple as this:
 
 ```bash
 # clone or fork this repo, then cd to it
 
 # Source the OpenStack RC file.
 # Make sure to use the file for the appropriate OpenStack project!!!
-# You will be prompted for your password
 source my-project-openrc.sh
 
-# List your S3 credentials
-openstack ec2 credentials list
-
 # Load the S3 credentials in env variables for security
-export AWS_ACCESS_KEY_ID=<ACCESS KEY VALUE FROM ABOVE>
-export AWS_SECRET_ACCESS_KEY=<SECRET KEY VALUE FROM ABOVE>
+export AWS_ACCESS_KEY_ID=$(\
+  openstack ec2 credential list --format json | \
+  jq -r '[.[] | select(."Project ID"==$ENV.OS_PROJECT_ID)] | .[0].Access'
+)
+export AWS_SECRET_ACCESS_KEY=$(\
+  openstack ec2 credential list --format json | \
+  jq -r '[.[] | select(."Project ID"==$ENV.OS_PROJECT_ID)] | .[0].Secret'
+)
 
 # (Optional but recommended)
 # Prepare the variables for the OpenTofu module
@@ -79,8 +125,7 @@ export AWS_SECRET_ACCESS_KEY=<SECRET KEY VALUE FROM ABOVE>
 cp terraform.tfvars.example terraform.tfvars
 
 # Modify the variables according to your needs
-#   code terraform.tfvars   # in VSCode
-#   vim terraform.tfvars    # in Vim
+vim terraform.tfvars
 
 # Init the OpenTofu directory
 tofu init
@@ -95,8 +140,7 @@ tofu plan
 tofu apply
 ```
 
-Assuming that apply went well, you now have all your VMs, networks, 
-security groups and floating IP ready for the K8S bootstrap!
+Assuming that apply went well, you now have all your VMs, networks, security groups and floating IPs ready for the K8S bootstrap!
 
 ### Configuration variables
 
@@ -139,7 +183,7 @@ control_plane_count = 3 # Default (3 or more for HA)
 worker_count        = 3 # Default (3 or more for HA)
 
 # Cloud-Init (User data)
-bastion_user_data_path = "userdata/bastion.yaml"
+bastion_user_data_path = "userdata/bastion.yaml"  # Make sure to add your public SSH key in the Bastion cloud-init !!!
 mgmt_user_data_path    = "userdata/mgmt.yaml"
 cp_user_data_path      = "userdata/k8s-master.yaml"
 worker_user_data_path  = "userdata/k8s-worker.yaml"
