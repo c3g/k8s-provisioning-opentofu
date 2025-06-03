@@ -5,14 +5,25 @@ packages:
   - syslog-ng
   - wget
   - net-tools
+  - langpacks-en
 
 package_update: true
 package_upgrade: true
 package_reboot_if_required: true
 
+yum_repos:
+  epel-release:
+    baseurl: https://download.fedoraproject.org/pub/epel/$releasever/Everything/$basearch
+    enabled: true
+    failovermethod: priority
+    gpgcheck: true
+    gpgkey: https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-9
+    name: Extra Packages for Enterprise Linux 9 - Release
+
 users:
   - name: admin
-    groups: adm, wheel, systemd-journal
+    homedir: /admin
+    groups: users, adm, wheel, systemd-journal
     selinux_user: unconfined_u
     sudo: ALL=(ALL) NOPASSWD:ALL
     ssh_authorized_keys: [
@@ -21,6 +32,35 @@ users:
       ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPjXNvynxihSsSiEQYK2wfSNWA6SdUFFylOx1CZUPXCu victor.rocheleau@mcgill.ca
     ]
 
+# Setup /home as a dedicated volume for Bastion, required for encryption
+device_aliases:
+  home_volume: /dev/vdb
+disk_setup:
+  home_volume:
+    table_type: gpt
+    layout: true
+    overwrite: false
+fs_setup:
+  - label: home_volume
+    device: /dev/vdb1
+    filesystem: xfs
+mounts:
+  - [ /dev/vdb1, /home,           xfs, "defaults,nofail", "0", "0"]
+
+# runcmd:
+#   # Init Bastion (requires manual review and startup)
+#   - git clone https://github.com/ovh/the-bastion /opt/bastion
+#   - git -C /opt/bastion checkout $(git -C /opt/bastion tag | tail -1)
+#   - /opt/bastion/bin/admin/packages-check.sh -i
+#   - /opt/bastion/bin/admin/install-ttyrec.sh -a
+#   - /opt/bastion/bin/admin/install --new-install
+
 disable_ec2_metadata: false
-timezone: "UTC-5" # EST
-fqdn: bastion.staging.pcgl.sd4h.ca
+timezone: America/Montreal
+locale: en_US.UTF-8
+
+# Hostname config
+hostname: bastion.c3g-dev-k8s
+fqdn: bastion.c3g-dev-k8s.sd4h.ca
+create_hostname_file: true
+prefer_fqdn_over_hostname: true

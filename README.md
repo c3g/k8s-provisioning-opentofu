@@ -3,7 +3,7 @@
 Use this repository as a template to provision the resources needed for a secure high-availability K8S cluster:
 - Bastion VM
   - Secures SSH access to the management VM
-  - FLoating IP
+  - FLoating IP with a Cloudflare DNS record
   - On the `mgmt-net` network
   - Security group for SSH
 - Management VM
@@ -146,6 +146,8 @@ tofu apply
 
 Assuming that apply went well, you now have all your VMs, networks, security groups and floating IPs ready for the K8S bootstrap!
 
+It also creates a DNS record for the Bastion VM: `bastion.<CLUSTER NAME>.sd4h.ca`
+
 ### Configuration variables
 
 The `terraform.tfvars` file is auto discovered by OpenTofu when running `plan` and `apply`, 
@@ -203,9 +205,13 @@ router_name       = "ROUTER NAME"
 
 ## Bastion config
 
-After a succesful `tofu apply`, you should be able to SSH to the bastion VM.
-There, follow the [installation instructions](https://ovh.github.io/the-bastion/installation/basic.html) for 
-OVH's The-Bastion.
+After a succesful `tofu apply`, you should be able to SSH to the bastion VM:
+```bash
+# SSH to the bastion VM with the admin user to finish the setup
+ssh admin@bastion.<CLUSTER NAME>.sd4h.ca
+```
+
+There, follow the [installation instructions](https://ovh.github.io/the-bastion/installation/basic.html) for OVH's The-Bastion.
 
 In the Bastion: 
 - [Create a group](https://ovh.github.io/the-bastion/plugins/restricted/groupCreate.html#groupcreate) for the Kubernetes admins, add the required users to that group.
@@ -214,19 +220,19 @@ In the Bastion:
 - [Get the egress key for the group you created](https://ovh.github.io/the-bastion/plugins/open/groupInfo.html)
   - This is a public SSH key that needs to be added to the management VM
 
-To add the key to the management VM, edit the `./userdata/mgmt.yaml` file and add the egress key to the 'bastion' user:
+To add the key to the management VM, edit the `./userdata/mgmt.yaml` file and add the egress key to the `k8s-mgmt` user:
 
 ```yaml
 #cloud-config
 users:
-  # ... don't touch the other users, just update 'bastion'
-  - name: bastion
+  # ... don't touch the other users, just update 'k8s-mgmt'
+  - name: k8s-mgmt
     groups: adm, wheel, systemd-journal
     selinux_user: unconfined_u
     sudo: ALL=(ALL) NOPASSWD:ALL
     ssh_authorized_keys: [
       # ADD BASTION GROUP'S EGRESS KEY HERE!!!
-      YOUR-BASTION-GROUP-EGRESS-KEY,
+      <YOUR-BASTION-GROUP-EGRESS-KEY>,
     ]
 ```
 
@@ -247,10 +253,18 @@ Now we can add the management VM to the list of servers belonging to the Bastion
 2. Use the `groupAddServer` command to add the management server to the group.
 ```bash
 # In Bastion:
-groupAddServer --group <your group> --host <mgmt VM IP on the mgmt network> --user bastion --port 22
+groupAddServer --group <your group> --host <CLUSTER NAME>-mgmt --user k8s-mgmt --port 22
 ```
 
 At this point, the users in the group can connect to the management VM via bastion, and bootstrap the K8S cluster!
+K8S managers will need to have Bastion accounts, they can jump to the management VM by using the Bastion SSH alias:
+```bash
+# Users need to setup their Bastion alias in their .bash_aliases
+alias bssh-<CLUSTER NAME>='ssh <USERNAME>@bastion.<CLUSTER NAME>.sd4h.ca -t -- '
+
+# SSH to the mgmt VM via Bastion!
+bssh-<CLUSTER NAME> k8s-mgmt@<CLUSTER NAME>-mgmt
+```
 
 ## Kubernetes bootstrap
 
@@ -258,9 +272,6 @@ At this point, the users in the group can connect to the management VM via basti
 COMING SOON
 
 ### Talos and talosctl
-COMING SOON
-
-## DNS bootstrap
 COMING SOON
 
 ## Cleaning up
