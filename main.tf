@@ -5,6 +5,10 @@ terraform {
       source  = "terraform-provider-openstack/openstack"
       version = "3.1.0"
     }
+    cloudflare = {
+      source = "cloudflare/cloudflare"
+      version = "5.5.0"
+    }
   }
   backend "s3" {
     bucket = "fried_tofu"
@@ -26,6 +30,20 @@ terraform {
 #   make sure you loaded the correct OpenStack RC file before applying this module.
 provider "openstack" {
   auth_url = "https://juno.calculquebec.ca:5000"
+}
+
+# Configure Cloudflare Provider
+variable "cloudflare_api_token" {
+  description = "API token for cloudflare DNS zone"
+  type = string
+}
+variable "clouflare_zone_id" {
+  description = "DNS zone ID, get from the Cloudflare dashboard"
+  type = string
+  default = "ef0aaf0dd92b0faf0064b84a7da2b67b"  # SD4H zone ID
+}
+provider "cloudflare" {
+    api_token = var.cloudflare_api_token
 }
 
 ######### Variables
@@ -95,14 +113,14 @@ variable "worker_flavor" {
 # K8S nodes counts
 variable "control_plane_count" {
   description = "The number of control plane nodes to create"
-  type = number
-  default = 3
+  type        = number
+  default     = 3
 }
 
 variable "worker_count" {
   description = "The number of worker nodes to create"
-  type = number
-  default = 3
+  type        = number
+  default     = 3
 }
 
 # Volume sizes & types
@@ -209,9 +227,22 @@ resource "openstack_networking_port_v2" "bastion_port" {
   }
 }
 
+### FLOATING IPs AND DNS RECORDS
+
 resource "openstack_networking_floatingip_associate_v2" "bastion_fip_assoc" {
   floating_ip = openstack_networking_floatingip_v2.bastion_fip.address
   port_id     = openstack_networking_port_v2.bastion_port.id
+}
+
+resource "cloudflare_dns_record" "bastion_dns" {
+    zone_id = var.clouflare_zone_id
+    comment = "${var.cluster_name} bastion DNS"
+    content = openstack_networking_floatingip_v2.bastion_fip.address
+    name = "bastion.${var.cluster_name}.sd4h.ca"
+    proxied = false
+    type = "A"
+    ttl = 3600
+    depends_on = [ openstack_networking_floatingip_associate_v2.bastion_fip_assoc ]
 }
 
 # Control plane subnet
@@ -306,9 +337,9 @@ resource "openstack_networking_secgroup_rule_v2" "worker_ssh" {
 
 # Control plane: allow all TCP from mgmt (for kubespray and k8s management)
 resource "openstack_networking_secgroup_rule_v2" "cp_from_mgmt" {
-  direction         = "ingress"
-  ethertype         = "IPv4"
-  protocol          = "tcp"
+  direction = "ingress"
+  ethertype = "IPv4"
+  protocol  = "tcp"
   # 0 for min and max allows all trafic to the control-plane network from the mgmt security group
   port_range_min    = 0
   port_range_max    = 0
@@ -318,9 +349,9 @@ resource "openstack_networking_secgroup_rule_v2" "cp_from_mgmt" {
 
 # Worker: allow all TCP from mgmt (for kubespray and k8s management)
 resource "openstack_networking_secgroup_rule_v2" "worker_from_mgmt" {
-  direction         = "ingress"
-  ethertype         = "IPv4"
-  protocol          = "tcp"
+  direction = "ingress"
+  ethertype = "IPv4"
+  protocol  = "tcp"
   # 0 for min and max allows all trafic to the worker network from the mgmt security group
   port_range_min    = 0
   port_range_max    = 0
@@ -337,13 +368,16 @@ resource "openstack_networking_floatingip_v2" "bastion_fip" {
 ######### COMPUTE INSTANCES
 
 # Bastion
-# TODO: bootstrap OVH's The Bastion
+resource "openstack_blockstorage_volume_v3" "bastion_home" {
+  name = "${var.cluster_name}-bastion-home-volume"
+  size = 10
+}
+
 resource "openstack_compute_instance_v2" "bastion" {
   name      = "${var.cluster_name}-bastion"
   flavor_id = var.bastion_flavor
   key_pair  = var.keypair
   security_groups = [
-    "default",
     openstack_networking_secgroup_v2.bastion_sg.name
   ]
   network {
@@ -361,6 +395,11 @@ resource "openstack_compute_instance_v2" "bastion" {
   # user_data  = file("${var.bastion_user_data_path}")
   user_data  = file(var.bastion_user_data_path)
   depends_on = [openstack_networking_subnet_v2.mgmt_subnet]
+}
+
+resource "openstack_compute_volume_attach_v2" "bastion_home_attached" {
+  instance_id = openstack_compute_instance_v2.bastion.id
+  volume_id   = openstack_blockstorage_volume_v3.bastion_home.id
 }
 
 # Management VM
