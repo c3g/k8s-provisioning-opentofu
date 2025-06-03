@@ -76,6 +76,7 @@ aws configure --profile=my-profile
 > Default output format [None]: json  
 
 # For convenience, make an alias that includes the SD4H object store endpoint
+# Use an alias name that clearly identifies the OpenStack project name
 alias aws-sd4h-my-profile="aws --profile my-profile --endpoint-url=https://objets.juno.calculquebec.ca"
 
 # Create a regular bucket for storage backend
@@ -92,7 +93,9 @@ aws-sd4h-my-profile s3api get-bucket-versioning --bucket fried_tofu
 ```
 
 Now, every time `tofu apply` is used, a new state version will be automatically uploaded to the S3 bucket we configured.
-This allows us to rollback to a previous state if needed. To get the list of state object versions:
+
+
+This allows us to retrieve a previous state if needed. To get the list of state object versions:
 
 ```bash
 aws-sd4h-my-profile s3api list-object-versions --bucket fried_tofu --prefix <cluster_name variable value>
@@ -110,6 +113,7 @@ With the S3 storage backend in place, using this template is as simple as this:
 source my-project-openrc.sh
 
 # Load the S3 credentials in env variables for security
+# The following commands extract the ACCESS_KEY and SECRET from the first credential found in the current project
 export AWS_ACCESS_KEY_ID=$(\
   openstack ec2 credential list --format json | \
   jq -r '[.[] | select(."Project ID"==$ENV.OS_PROJECT_ID)] | .[0].Access'
@@ -259,3 +263,15 @@ COMING SOON
 ## DNS bootstrap
 COMING SOON
 
+## Cleaning up
+
+At any time, the provisioned infrastructure can be quickly destroyed and recreated with a few `tofu` commands:
+
+```bash
+# Destroy
+tofu destroy
+
+# Recreate
+tofu plan
+tofu apply
+```
