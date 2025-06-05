@@ -47,13 +47,22 @@ fs_setup:
 mounts:
   - [ /dev/vdb1, /home,           xfs, "defaults,nofail", "0", "0"]
 
-# runcmd:
-#   # Init Bastion (requires manual review and startup)
-#   - git clone https://github.com/ovh/the-bastion /opt/bastion
-#   - git -C /opt/bastion checkout $(git -C /opt/bastion tag | tail -1)
-#   - /opt/bastion/bin/admin/packages-check.sh -i
-#   - /opt/bastion/bin/admin/install-ttyrec.sh -a
-#   - /opt/bastion/bin/admin/install --new-install
+runcmd:
+  # Init Bastion
+  - git clone https://github.com/ovh/the-bastion /opt/bastion
+  - git -C /opt/bastion checkout $(git -C /opt/bastion tag | tail -1) # TODO: pin version
+  - /opt/bastion/bin/admin/packages-check.sh -i
+  - /opt/bastion/bin/admin/install-ttyrec.sh -a
+  - /opt/bastion/bin/admin/install --new-install
+  # Set bastionName in config file
+  - grep -v ^# /etc/bastion/bastion.conf | jq '.bastionName="${bastion_name}"' > new-conf.json
+  - cp /etc/bastion/bastion.conf /etc/bastion/bastion.conf.original
+  - mv new-conf.json /etc/bastion/bastion.conf
+  # Check install OK
+  - /opt/bastion/bin/dev/perl-check.sh
+  # Create first admin user
+  - echo ${bastion_admin_user_pub_key} | /opt/bastion/bin/admin/setup-first-admin-account.sh ${bastion_admin_user_name} auto
+  - systemctl reload sshd
 
 disable_ec2_metadata: false
 timezone: America/Montreal

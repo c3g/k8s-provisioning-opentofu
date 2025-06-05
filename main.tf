@@ -1,12 +1,16 @@
-######### OpenStack OpenTofu provider
+######################################
+######### OpenTofu providers #########
+######################################
 terraform {
   required_providers {
+    # OpenStack provider for Compute/Storage/Networking
     openstack = {
       source  = "terraform-provider-openstack/openstack"
       version = "3.1.0"
     }
+    # Cloudflare provider for DNS records
     cloudflare = {
-      source = "cloudflare/cloudflare"
+      source  = "cloudflare/cloudflare"
       version = "5.5.0"
     }
   }
@@ -20,37 +24,57 @@ terraform {
     # Skip validations that fail with Ceph S3
     skip_requesting_account_id  = true
     skip_credentials_validation = true
-    # NOTE: requires AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY to be loaded in env vars
   }
 }
 
-# Configure the OpenStack Provider
-# WARNING !!!
+# OpenStack Provider config
+# WARNING:
 #   All other configurations are assumed to be provided from environment variables,
 #   make sure you loaded the correct OpenStack RC file before applying this module.
 provider "openstack" {
   auth_url = "https://juno.calculquebec.ca:5000"
 }
 
-# Configure Cloudflare Provider
+# Cloudflare provider config and variables
 variable "cloudflare_api_token" {
   description = "API token for cloudflare DNS zone"
-  type = string
-}
-variable "clouflare_zone_id" {
-  description = "DNS zone ID, get from the Cloudflare dashboard"
-  type = string
-  default = "ef0aaf0dd92b0faf0064b84a7da2b67b"  # SD4H zone ID
-}
-provider "cloudflare" {
-    api_token = var.cloudflare_api_token
+  type        = string
+  sensitive   = true
 }
 
-######### Variables
+
+variable "clouflare_zone_id" {
+  description = "DNS zone ID, get from Cloudflare dashboard"
+  type        = string
+  default     = "ef0aaf0dd92b0faf0064b84a7da2b67b" # SD4H zone ID
+}
+
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
+}
+
+#############################
+######### VARIABLES #########
+#############################
 
 # Cluster name
 variable "cluster_name" {
   description = "Resource name for the K8S cluster, will be the prefix to all OpenStack resources created."
+  type        = string
+}
+
+variable "bastion_name" {
+  description = "Friendly name for the Bastion instance."
+  type        = string
+}
+
+variable "bastion_admin_user_name" {
+  description = "User name for the initial admin account that will be created"
+  type        = string
+}
+
+variable "bastion_admin_user_pub_key" {
+  description = "Public SSH key for the admin user"
   type        = string
 }
 
@@ -235,14 +259,14 @@ resource "openstack_networking_floatingip_associate_v2" "bastion_fip_assoc" {
 }
 
 resource "cloudflare_dns_record" "bastion_dns" {
-    zone_id = var.clouflare_zone_id
-    comment = "${var.cluster_name} bastion DNS"
-    content = openstack_networking_floatingip_v2.bastion_fip.address
-    name = "bastion.${var.cluster_name}.sd4h.ca"
-    proxied = false
-    type = "A"
-    ttl = 3600
-    depends_on = [ openstack_networking_floatingip_associate_v2.bastion_fip_assoc ]
+  zone_id    = var.clouflare_zone_id
+  comment    = "${var.cluster_name} bastion DNS"
+  content    = openstack_networking_floatingip_v2.bastion_fip.address
+  name       = "bastion.${var.cluster_name}.sd4h.ca"
+  proxied    = false
+  type       = "A"
+  ttl        = 3600
+  depends_on = [openstack_networking_floatingip_associate_v2.bastion_fip_assoc]
 }
 
 # Control plane subnet
@@ -392,8 +416,12 @@ resource "openstack_compute_instance_v2" "bastion" {
     boot_index            = 0
     delete_on_termination = true
   }
-  # user_data  = file("${var.bastion_user_data_path}")
-  user_data  = file(var.bastion_user_data_path)
+  # user_data  = file(var.bastion_user_data_path)
+  user_data = templatefile(var.bastion_user_data_path, {
+    bastion_name               = var.bastion_name,
+    bastion_admin_user_name    = var.bastion_admin_user_name,
+    bastion_admin_user_pub_key = var.bastion_admin_user_pub_key
+  })
   depends_on = [openstack_networking_subnet_v2.mgmt_subnet]
 }
 
@@ -468,4 +496,10 @@ resource "openstack_compute_instance_v2" "worker" {
   }
   user_data  = file("${var.worker_user_data_path}")
   depends_on = [openstack_networking_subnet_v2.worker_subnet]
+}
+
+output "bastion_alias" {
+  description = "Bastion SSH alias."
+  value       = "alias ${var.bastion_name}=ssh ${var.bastion_admin_user_name}@${cloudflare_dns_record.bastion_dns.name} -t -- "
+  depends_on  = [cloudflare_dns_record.bastion_dns]
 }
