@@ -253,9 +253,22 @@ resource "openstack_networking_port_v2" "bastion_port" {
 
 ### FLOATING IPs AND DNS RECORDS
 
+resource "openstack_networking_floatingip_v2" "bastion_fip" {
+  pool = "Public-Network"
+}
+
+resource "openstack_networking_floatingip_v2" "lb_fip" {
+  pool = "Public-Network"
+}
+
 resource "openstack_networking_floatingip_associate_v2" "bastion_fip_assoc" {
   floating_ip = openstack_networking_floatingip_v2.bastion_fip.address
   port_id     = openstack_networking_port_v2.bastion_port.id
+}
+
+resource "openstack_networking_floatingip_associate_v2" "lb_fip_assoc" {
+  floating_ip = openstack_networking_floatingip_v2.lb_fip.address
+  port_id     = openstack_networking_port_v2.lb_port.id
 }
 
 resource "cloudflare_dns_record" "bastion_dns" {
@@ -269,7 +282,18 @@ resource "cloudflare_dns_record" "bastion_dns" {
   depends_on = [openstack_networking_floatingip_associate_v2.bastion_fip_assoc]
 }
 
-# Control plane subnet
+resource "cloudflare_dns_record" "lb_dns" {
+  zone_id    = var.clouflare_zone_id
+  comment    = "${var.cluster_name} load balancer DNS"
+  content    = openstack_networking_floatingip_v2.lb_fip.address
+  name       = "k8s.${var.cluster_name}.sd4h.ca"
+  proxied    = false
+  type       = "A"
+  ttl        = 3600
+  depends_on = [openstack_networking_floatingip_associate_v2.lb_fip_assoc]
+}
+
+# Control plane networking
 resource "openstack_networking_network_v2" "cp_net" {
   name = "${var.cluster_name}-cp-net"
 }
@@ -291,6 +315,32 @@ resource "openstack_networking_subnet_v2" "worker_subnet" {
   network_id = openstack_networking_network_v2.worker_net.id
   cidr       = "172.16.3.0/24"
   ip_version = 4
+}
+
+# Custom load-balancer networking (TODO: replace with Openstack LBaaS once available)
+resource "openstack_networking_network_v2" "lb_net" {
+  name           = "${var.cluster_name}-lb-net"
+  admin_state_up = "true"
+}
+
+resource "openstack_networking_subnet_v2" "lb_subnet" {
+  name       = "${var.cluster_name}-lb-subnet"
+  network_id = openstack_networking_network_v2.lb_net.id
+  cidr       = "172.16.4.0/24"
+  ip_version = 4
+}
+
+resource "openstack_networking_router_interface_v2" "lb_router_interface" {
+  router_id = data.openstack_networking_router_v2.router.id
+  subnet_id = openstack_networking_subnet_v2.lb_subnet.id
+}
+
+resource "openstack_networking_port_v2" "lb_port" {
+  network_id         = openstack_networking_network_v2.lb_net.id
+  security_group_ids = [openstack_networking_secgroup_v2.lb_sg.id]
+  fixed_ip {
+    subnet_id = openstack_networking_subnet_v2.lb_subnet.id
+  }
 }
 
 ######### SECURITY GROUPS
@@ -383,10 +433,30 @@ resource "openstack_networking_secgroup_rule_v2" "worker_from_mgmt" {
   security_group_id = openstack_networking_secgroup_v2.worker_sg.id
 }
 
-######### FLOATING IP FOR BASTION
+# Load Balancer
+resource "openstack_networking_secgroup_v2" "lb_sg" {
+  name        = "${var.cluster_name}-lb-sg"
+  description = "Load Balancer security group"
+}
 
-resource "openstack_networking_floatingip_v2" "bastion_fip" {
-  pool = "Public-Network"
+resource "openstack_networking_secgroup_rule_v2" "lb_k8s_api" {
+  direction         = "ingress"
+  ethertype         = "IPv4"
+  protocol          = "tcp"
+  port_range_min    = 6443
+  port_range_max    = 6443
+  remote_ip_prefix  = "0.0.0.0/0"
+  security_group_id = openstack_networking_secgroup_v2.lb_sg.id
+}
+
+resource "openstack_networking_secgroup_rule_v2" "cp_from_lb" {
+  direction         = "ingress"
+  ethertype         = "IPv4"
+  protocol          = "tcp"
+  port_range_min    = 6443
+  port_range_max    = 6443
+  remote_group_id   = openstack_networking_secgroup_v2.lb_sg.id
+  security_group_id = openstack_networking_secgroup_v2.cp_sg.id
 }
 
 ######### COMPUTE INSTANCES
@@ -496,6 +566,28 @@ resource "openstack_compute_instance_v2" "worker" {
   }
   user_data  = file("${var.worker_user_data_path}")
   depends_on = [openstack_networking_subnet_v2.worker_subnet]
+}
+
+resource "openstack_compute_instance_v2" "load_balancer" {
+  # count           = 1 # TODO: param
+  name            = "${var.cluster_name}-lb"
+  flavor_id       = var.bastion_flavor # TODO: own flavor var
+  key_pair        = var.keypair
+  security_groups = [openstack_networking_secgroup_v2.lb_sg.name]
+  network {
+    port = openstack_networking_port_v2.lb_port.id
+  }
+  block_device {
+    uuid                  = var.bastion_image # TODO: own image var
+    source_type           = "image"
+    destination_type      = "volume"
+    volume_type           = var.bastion_volume_type
+    volume_size           = var.bastion_volume_size
+    boot_index            = 0
+    delete_on_termination = true
+  }
+  user_data  = file("${var.mgmt_user_data_path}") # TODO: own LB user data
+  depends_on = [openstack_networking_subnet_v2.lb_subnet]
 }
 
 output "bastion_alias" {
