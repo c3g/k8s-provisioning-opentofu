@@ -2,23 +2,35 @@
 
 Use this repository as a template to provision the resources needed for a secure high-availability K8S cluster:
 - Bastion VM
-  - Secures SSH access to the management VM
+  - **Only instance to allow SSH from outside**
+  - See [The Bastion](https://ovh.github.io/the-bastion/using/basics/first_steps.html) usage docs
+  - The opentofu module outputs the Bastion alias for the bootstrapped user
+  - Jump proxy SSH connections to:
+    - Management VM
+    - Load Balancer
   - FLoating IP with a Cloudflare DNS record
   - On the `mgmt-net` network
-  - Security group for SSH
 - Management VM
-  - Accessible via Bastion only
   - Contains the tools to bootstrap and manage the K8S cluster
   - On the `mgmt-net` network
-  - Security group allows SSH from Bastion only
+  - SSH access via Bastion **only**
+- Load Balancer VMs
+  - Provision an HAProxy VM preconfigured for k8s endpoints on the control-plane
+  - HAProxy config for K8S endpoints is auto generated and enabled with Cloud-Init
+  - On the `lb-net` network
+    - Security group for TCP ingress on port `6443` only
+  - SSH access via Bastion **only**
 - Control plane VMs
-  - Provision a number of VMs for the K8S control plane
+  - Provision the desired number of VMs for the K8S control plane
   - On the `cp-net` network
-  - Security group allows mgmt and worker trafic
+    - Allow 6443 TCP ingress from load-balancer security-group
+    - Allows mgmt and worker security-group trafic
+    - SSH via mgmt only (Kubespray)
 - Worker VMs
-  - Provision a number of VMs as K8S worker nodes
+  - Provision the desired number of VMs as K8S worker nodes
   - On the `worker-net` network
-  - Security group allows mgmt and control plane trafic
+    - Allows mgmt and control plane security-group trafic
+    - SSH via mgmt only (Kubespray)
 
 
 ## Requirements
@@ -101,62 +113,26 @@ This allows us to retrieve a previous state if needed. To get the list of state 
 aws-sd4h-my-profile s3api list-object-versions --bucket fried_tofu --prefix <cluster_name variable value>
 ```
 
-## Usage
-
-With the S3 storage backend in place, using this template is as simple as this:
-
-```bash
-# clone or fork this repo, then cd to it
-
-# Source the OpenStack RC file.
-# Make sure to use the file for the appropriate OpenStack project!!!
-source my-project-openrc.sh
-
-# Load the S3 credentials in env variables for security
-# The following commands extract the ACCESS_KEY and SECRET from the first credential found in the current project
-export AWS_ACCESS_KEY_ID=$(\
-  openstack ec2 credential list --format json | \
-  jq -r '[.[] | select(."Project ID"==$ENV.OS_PROJECT_ID)] | .[0].Access'
-)
-export AWS_SECRET_ACCESS_KEY=$(\
-  openstack ec2 credential list --format json | \
-  jq -r '[.[] | select(."Project ID"==$ENV.OS_PROJECT_ID)] | .[0].Secret'
-)
-
-# (Optional but recommended)
-# Prepare the variables for the OpenTofu module
-# If you don't do this, OpenTofu will give you interactive prompts to provide values.
-cp terraform.tfvars.example terraform.tfvars
-
-# Modify the variables according to your needs
-vim terraform.tfvars
-
-# Init the OpenTofu directory
-tofu init
-
-# Plan the OpenTofu deployment
-tofu plan
-
-# Review the plan and fix what needs fixing, then plan again
-# Repeat until no errors in plan
-
-# Apply your deployment plan!
-tofu apply
-```
-
-Assuming that apply went well, you now have all your VMs, networks, security groups and floating IPs ready for the K8S bootstrap!
-
-It also creates a DNS record for the Bastion VM: `bastion.<CLUSTER NAME>.sd4h.ca`
-
 ### Configuration variables
 
 The `terraform.tfvars` file is auto discovered by OpenTofu when running `plan` and `apply`, 
 use it to provide the values to the required variables.
 
+
+You can create one from the provided template:
+```bash
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Set appropriate values for all variables.
+Note that this config file uses a cloudlare API token, so it should never be commited to source control.
+
 ```bash
 # Cluster name, will be the prefix to all OpenStack resources created.
 # Use a lower case hyphen-separated name for consistency
 cluster_name = "c3g-dev-k8s"
+
+cloudflare_api_token = "<YOUR CLOUDFLARE API TOKEN>"
 
 # Image variables, always use the ID.
 #   Get options with 'openstack image list'
@@ -193,6 +169,7 @@ bastion_user_data_path = "userdata/bastion.yaml"  # Make sure to add your public
 mgmt_user_data_path    = "userdata/mgmt.yaml"
 cp_user_data_path      = "userdata/k8s-master.yaml"
 worker_user_data_path  = "userdata/k8s-worker.yaml"
+lb_user_data_path      = "userdata/load-balancer.yaml"
 
 # OpenStack keypair
 #   Get valid options with 'openstack keypair list'
@@ -201,32 +178,89 @@ keypair = "YOUR KEYPAIR NAME"
 # Networking
 public_network_id = "PUBLIC NETWORK UUID"
 router_name       = "ROUTER NAME"
+
+# Bastion config
+bastion_admin_user_name    = "<USERNAME FOR THE INITIAL BASTION ADMIN>"
+bastion_admin_user_pub_key = "<PUBLIC SSH KEY FOR THE USER>"
+bastion_name               = "<BASTION NAME>" # Will also be the Bastion alias name
 ```
+
+## Usage
+
+With the S3 storage backend in place, using this template is as simple as this:
+
+```bash
+# clone or fork this repo, then cd to it
+
+# Source the OpenStack RC file.
+# Make sure to use the file for the appropriate OpenStack project!!!
+source my-project-openrc.sh
+
+# Load the S3 credentials in env variables for security
+# The following commands extract the ACCESS_KEY and SECRET from the first credential found in the current project
+export AWS_ACCESS_KEY_ID=$(\
+  openstack ec2 credential list --format json | \
+  jq -r '[.[] | select(."Project ID"==$ENV.OS_PROJECT_ID)] | .[0].Access'
+)
+export AWS_SECRET_ACCESS_KEY=$(\
+  openstack ec2 credential list --format json | \
+  jq -r '[.[] | select(."Project ID"==$ENV.OS_PROJECT_ID)] | .[0].Secret'
+)
+
+# (Optional but recommended)
+# Prepare the variables for the OpenTofu module
+# If you don't do this, OpenTofu will give you interactive prompts to provide values.
+cp terraform.tfvars.example terraform.tfvars
+
+# Modify the variables according to your needs (see previous section)
+vim terraform.tfvars
+
+# Init the OpenTofu directory
+tofu init
+
+# Plan the OpenTofu deployment
+tofu plan
+
+# Review the plan and fix what needs fixing, then plan again
+# Repeat until no errors in plan
+
+# Apply your deployment plan!
+tofu apply
+```
+
+Assuming that apply went well, you now have all your VMs, networks, security groups and floating IPs ready for the K8S bootstrap!
+
+It also creates a DNS record for the Bastion VM: `bastion.<CLUSTER NAME>.sd4h.ca`
 
 ## Bastion config
 
-After a succesful `tofu apply`, you should be able to SSH to the bastion VM:
+After a succesful `tofu apply`, the module will output the Bastion alias for your admin user.
+You will need to wait a few minutes for the Cloud-Init to be fully applied before attempting to SSH.
+
+Once the Clout-Init has been applied, you should be able to SSH using the alias output.
+If the Bastion DNS record is not propagated yet, using the IP instead of the domain also works.
+
+### Create Bastion group
+
 ```bash
-# SSH to the bastion VM with the admin user to finish the setup
-ssh admin@bastion.<CLUSTER NAME>.sd4h.ca
+# Create a group
+<BASTION ALIAS> --osh groupCreate --group k8s --owner <BASTION ADMIN USER NAME> --algo ed25519
+# Copy the group's public key
 ```
 
-There, follow the [installation instructions](https://ovh.github.io/the-bastion/installation/basic.html) for OVH's The-Bastion.
+### Prepare VMs to be accessible via Bastion
 
-In the Bastion: 
-- [Create a group](https://ovh.github.io/the-bastion/plugins/restricted/groupCreate.html#groupcreate) for the Kubernetes admins, add the required users to that group.
-- [Create an account](https://ovh.github.io/the-bastion/plugins/restricted/accountCreate.html) for each K8S manager.
-- [Add the accounts to the group](https://ovh.github.io/the-bastion/plugins/group-gatekeeper/groupAddMember.html#groupaddmember)
-- [Get the egress key for the group you created](https://ovh.github.io/the-bastion/plugins/open/groupInfo.html)
-  - This is a public SSH key that needs to be added to the management VM
+To make VMs accessible via the Bastion group we created, we need to add the group's public SSH key to the VMs' user data.
 
-To add the key to the management VM, edit the `./userdata/mgmt.yaml` file and add the egress key to the `k8s-mgmt` user:
+Do the following in:
+  - `userdata/mgmt.yaml`
+  - `userdata/load-balancer.yaml` (optional, can be done later)
 
 ```yaml
 #cloud-config
 users:
-  # ... don't touch the other users, just update 'k8s-mgmt'
-  - name: k8s-mgmt
+  # ... don't touch the other users, just update the 'bastion' user
+  - name: bastion
     groups: adm, wheel, systemd-journal
     selinux_user: unconfined_u
     sudo: ALL=(ALL) NOPASSWD:ALL
@@ -236,7 +270,7 @@ users:
     ]
 ```
 
-Changing this value will result in the management VM being fully replaced, so only do this once.
+Changing Cloud-Init files will result in VMs being fully replaced, so only do this once.
 
 Review the plan and apply it if it looks good:
 
@@ -248,12 +282,22 @@ tofu plan
 tofu apply
 ```
 
-Now we can add the management VM to the list of servers belonging to the Bastion group:
-1. SSH into bastion with the alias (`bssh` by default).
-2. Use the `groupAddServer` command to add the management server to the group.
+Wait for Cloud-Init to finish, otherwise the new authorized SSH key will not be ready.
+
+### Add our VMs to the Bastion group
+
+Now we can add the VMs to the list of servers belonging to the Bastion group.
+Use the `groupAddServer` Bastion command to add the management server to the group.
 ```bash
-# In Bastion:
-groupAddServer --group <your group> --host <CLUSTER NAME>-mgmt --user k8s-mgmt --port 22
+# For the mgmt VM
+<BASTION ALIAS> --osh groupAddServer --group k8s --host <CLUSTER NAME>-mgmt --user bastion --port 22
+
+# For the Load Balancer (optional)
+<BASTION ALIAS> --osh groupAddServer --group k8s --host <CLUSTER NAME>-lb --user bastion --port 22
+
+# Test access!
+# e.g. bssh bastion@c3g-dev-k8s-mgmt
+<BASTION ALIAS> bastion@<CLUSTER NAME>-mgmt
 ```
 
 At this point, the users in the group can connect to the management VM via bastion, and bootstrap the K8S cluster!
@@ -263,16 +307,80 @@ K8S managers will need to have Bastion accounts, they can jump to the management
 alias bssh-<CLUSTER NAME>='ssh <USERNAME>@bastion.<CLUSTER NAME>.sd4h.ca -t -- '
 
 # SSH to the mgmt VM via Bastion!
-bssh-<CLUSTER NAME> k8s-mgmt@<CLUSTER NAME>-mgmt
+<BASTION ALIAS> bastion@<CLUSTER NAME>-mgmt
 ```
 
 ## Kubernetes bootstrap
+
+Everything should now be ready to begin bootstraping your HA Kubernetes cluster!
+- An HAProxy load balancer is serving the K8S endpoints
+- Networks and security groups isolate the
+
+We recommend and document two popular options: [Kubespray](https://kubespray.io) and [Talos Linux](https://www.talos.dev/v1.10/)
 
 ### Kubespray
 COMING SOON
 
 ### Talos and talosctl
-COMING SOON
+
+Refer to the official Talos Linux instructions for cluster configuration on Openstack, [here](https://www.talos.dev/v1.10/talos-guides/install/cloud-platforms/openstack/#cluster-configuration).
+
+The steps before "Cluster Configuration" have been taken care of by the OpenTofu module, start from there until you have a working kubeconfig.
+
+#### Generate Clout-Init files for Talos
+```bssh
+# SSH to the management VM
+<BASTION ALIAS> bastion@<CLUSTER NAME>-mgmt
+
+# Install talosctl
+curl -sL https://talos.dev/install | sh
+
+# Generate the talosconfig
+talosctl gen config <CLUSTER NAME> https://${LB_PUBLIC_IP}:6443
+
+# Copy the content of 'controlplane.yaml'
+# Copy the content of 'worker.yaml'
+```
+
+#### Provision Talos control-plane and workers
+<!-- TODO: make a dir that is ignored by gitignore for sensitive user-data -->
+Paste the content of 'controlplane.yaml' into `userdata/k8s-master.yaml`.
+Paste the content of 'worker.yaml' into `userdata/k8s-worker.yaml`.
+
+This will cause a replacement of all control-plane and worker nodes, with the required Talos user data for bootstrap.
+
+Plan and apply the changes:
+```bash
+tofu plan   # make sure planned changes look OK
+tofu apply  # apply the changes
+```
+
+#### Bootstrap Talos
+
+Once the control-plane and worker VMs are up and running, we can bootstrap the Talos cluster.
+Take note of the private IP for one of the control-plane VMs (doesn't matter which one!).
+
+```bash
+# SSH to the management VM
+<BASTION ALIAS> bastion@<CLUSTER NAME>-mgmt
+
+# Configure Talos bootstrap endpoint
+talosctl --talosconfig talosconfig config endpoint <control plane 1 IP>
+talosctl --talosconfig talosconfig config node <control plane 1 IP>
+
+# Bootstrap the cluster!
+talosctl --talosconfig talosconfig bootstrap
+
+# Get the kubeconfig file and place it at the expected location for kubectl
+talosctl --talosconfig talosconfig kubeconfig .
+mkdir -p ~/.kube
+cp kubeconfig ~/.kube/config
+
+# Start using the cluster!
+kubectl get nodes     # All nodes should be in status "Ready"
+kubectl get pods -A   # All pods in kube-system namespace should be running
+```
+
 
 ## Cleaning up
 

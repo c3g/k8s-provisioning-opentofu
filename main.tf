@@ -310,6 +310,11 @@ resource "openstack_networking_subnet_v2" "cp_subnet" {
   ip_version = 4
 }
 
+resource "openstack_networking_router_interface_v2" "cp_router_interface" {
+  router_id = data.openstack_networking_router_v2.router.id
+  subnet_id = openstack_networking_subnet_v2.cp_subnet.id
+}
+
 # Worker subnet
 resource "openstack_networking_network_v2" "worker_net" {
   name = "${var.cluster_name}-worker-net"
@@ -419,10 +424,36 @@ resource "openstack_networking_secgroup_rule_v2" "cp_from_mgmt" {
   direction = "ingress"
   ethertype = "IPv4"
   protocol  = "tcp"
-  # 0 for min and max allows all trafic to the control-plane network from the mgmt security group
-  port_range_min    = 0
-  port_range_max    = 0
+  # port_range_min    = 0
+  # port_range_max    = 0
   remote_group_id   = openstack_networking_secgroup_v2.mgmt_sg.id
+  security_group_id = openstack_networking_secgroup_v2.cp_sg.id
+}
+
+resource "openstack_networking_secgroup_rule_v2" "cp_from_mgmt_talos" {
+  direction = "ingress"
+  ethertype = "IPv4"
+  protocol  = "tcp"
+  port_range_min    = 50000
+  port_range_max    = 50000
+  remote_group_id   = openstack_networking_secgroup_v2.mgmt_sg.id
+  security_group_id = openstack_networking_secgroup_v2.cp_sg.id
+}
+
+# Allow all trafic between Control-plane nodes and worker nodes
+resource "openstack_networking_secgroup_rule_v2" "cp_to_worker_all" {
+  direction         = "ingress"
+  ethertype         = "IPv4"
+  protocol          = null
+  remote_group_id   = openstack_networking_secgroup_v2.cp_sg.id
+  security_group_id = openstack_networking_secgroup_v2.worker_sg.id
+}
+
+resource "openstack_networking_secgroup_rule_v2" "worker_to_cp_all" {
+  direction         = "ingress"
+  ethertype         = "IPv4"
+  protocol          = null
+  remote_group_id   = openstack_networking_secgroup_v2.worker_sg.id
   security_group_id = openstack_networking_secgroup_v2.cp_sg.id
 }
 
@@ -431,7 +462,6 @@ resource "openstack_networking_secgroup_rule_v2" "worker_from_mgmt" {
   direction = "ingress"
   ethertype = "IPv4"
   protocol  = "tcp"
-  # 0 for min and max allows all trafic to the worker network from the mgmt security group
   port_range_min    = 0
   port_range_max    = 0
   remote_group_id   = openstack_networking_secgroup_v2.mgmt_sg.id
@@ -533,7 +563,9 @@ resource "openstack_compute_instance_v2" "mgmt" {
     boot_index            = 0
     delete_on_termination = true
   }
-  user_data  = file("${var.mgmt_user_data_path}")
+  user_data  = templatefile(var.mgmt_user_data_path, {
+    cluster_name = var.cluster_name
+  })
   depends_on = [openstack_networking_subnet_v2.mgmt_subnet]
 }
 
