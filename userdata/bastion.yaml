@@ -50,7 +50,7 @@ mounts:
 runcmd:
   # Init Bastion
   - git clone https://github.com/ovh/the-bastion /opt/bastion
-  - git -C /opt/bastion checkout $(git -C /opt/bastion tag | tail -1) # TODO: pin version
+  - git -C /opt/bastion checkout v3.20.00
   - /opt/bastion/bin/admin/packages-check.sh -i
   - /opt/bastion/bin/admin/install-ttyrec.sh -a
   - /opt/bastion/bin/admin/install --new-install

@@ -219,6 +219,11 @@ variable "worker_user_data_path" {
   type        = string
 }
 
+variable "lb_user_data_path" {
+  description = "Path to the Cloud-Init file for the load balancer(s) VM(s)"
+  type        = string
+}
+
 ######### NETWORKING
 
 # Bastion + Management subnet
@@ -449,6 +454,16 @@ resource "openstack_networking_secgroup_rule_v2" "lb_k8s_api" {
   security_group_id = openstack_networking_secgroup_v2.lb_sg.id
 }
 
+resource "openstack_networking_secgroup_rule_v2" "lb_ssh_from_bastion" {
+  direction         = "ingress"
+  ethertype         = "IPv4"
+  protocol          = "tcp"
+  port_range_min    = 22
+  port_range_max    = 22
+  remote_group_id   = openstack_networking_secgroup_v2.bastion_sg.id
+  security_group_id = openstack_networking_secgroup_v2.lb_sg.id
+}
+
 resource "openstack_networking_secgroup_rule_v2" "cp_from_lb" {
   direction         = "ingress"
   ethertype         = "IPv4"
@@ -586,7 +601,10 @@ resource "openstack_compute_instance_v2" "load_balancer" {
     boot_index            = 0
     delete_on_termination = true
   }
-  user_data  = file("${var.mgmt_user_data_path}") # TODO: own LB user data
+  user_data = templatefile(var.lb_user_data_path, {
+    lb_domain = "k8s.${var.cluster_name}.sd4h.ca",
+    ip_addrs  = [for i in range(var.control_plane_count) : openstack_compute_instance_v2.control_plane[i].access_ip_v4]
+  })
   depends_on = [openstack_networking_subnet_v2.lb_subnet]
 }
 
