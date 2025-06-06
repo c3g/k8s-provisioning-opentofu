@@ -117,7 +117,9 @@ aws-sd4h-my-profile s3api list-object-versions --bucket fried_tofu --prefix <clu
 
 The VM provisioning relies on Cloud-Init for all nodes, ready to use templates can be found at `userdata/tpl/*.yaml`.
 
-Files under `userdata/live/` are ignored by Git by default, in order to avoid leaking sensitive data to source control.
+> [!WARNING]
+> Files under `userdata/live/` are ignored by Git by default, in order to avoid leaking sensitive data to source control.
+
 
 Create the files you will be using from the templates:
 ```bash
@@ -141,7 +143,10 @@ cp terraform.tfvars.example terraform.tfvars
 ```
 
 Set appropriate values for all variables.
-Note that this config file uses a cloudlare API token, so it should never be commited to source control.
+> [!WARNING]
+> Note that this config file uses a cloudlare API token, so it should never be commited to source control.
+>
+> By default, `terraform.tfvars` is in the gitignore, **DO NOT CHANGE THIS**.
 
 ```bash
 # Cluster name, will be the prefix to all OpenStack resources created.
@@ -269,8 +274,8 @@ If the Bastion DNS record is not propagated yet, using the IP instead of the dom
 To make VMs accessible via the Bastion group we created, we need to add the group's public SSH key to the VMs' user data.
 
 Do the following in:
-  - `userdata/mgmt.yaml`
-  - `userdata/load-balancer.yaml` (optional, can be done later)
+  - `userdata/live/mgmt.yaml`
+  - `userdata/live/load-balancer.yaml` (optional, can be done later)
 
 ```yaml
 #cloud-config
@@ -309,7 +314,7 @@ Use the `groupAddServer` Bastion command to add the management server to the gro
 <BASTION ALIAS> --osh groupAddServer --group k8s --host <CLUSTER NAME>-mgmt --user bastion --port 22
 
 # For the Load Balancer (optional)
-<BASTION ALIAS> --osh groupAddServer --group k8s --host <CLUSTER NAME>-lb --user bastion --port 22
+<BASTION ALIAS> --osh groupAddServer --group k8s --host <LB PRIVATE IP> --user bastion --port 22 --comment "load balancer"
 
 # Test access!
 # e.g. bssh bastion@c3g-dev-k8s-mgmt
@@ -359,9 +364,12 @@ talosctl gen config <CLUSTER NAME> https://${LB_PUBLIC_IP}:6443
 ```
 
 #### Provision Talos control-plane and workers
-<!-- TODO: make a dir that is ignored by gitignore for sensitive user-data -->
-Paste the content of 'controlplane.yaml' into `userdata/k8s-master.yaml`.
-Paste the content of 'worker.yaml' into `userdata/k8s-worker.yaml`.
+Paste the content of 'controlplane.yaml' into `userdata/live/k8s-master.yaml`.
+Paste the content of 'worker.yaml' into `userdata/live/k8s-worker.yaml`.
+
+> [!CAUTION]
+> Talos Cloud-Init files contain sensitive information.
+> Never commit this file, it can be retrieved by authorized Bastion users when needed.
 
 This will cause a replacement of all control-plane and worker nodes, with the required Talos user data for bootstrap.
 
