@@ -33,10 +33,11 @@ control_plane_count = 3 # Default (3 or more for HA)
 worker_count        = 3 # Default (3 or more for HA)
 
 # Cloud-Init (User data)
-bastion_user_data_path = "userdata/bastion.yaml"
-mgmt_user_data_path    = "userdata/mgmt.yaml"
-cp_user_data_path      = "userdata/k8s-master.yaml"
-worker_user_data_path  = "userdata/k8s-worker.yaml"
+bastion_user_data_path = "userdata/live/bastion.yaml"
+mgmt_user_data_path    = "userdata/live/mgmt.yaml"
+cp_user_data_path      = "userdata/live/k8s-master.yaml"
+worker_user_data_path  = "userdata/live/k8s-worker.yaml"
+lb_user_data_path      = "userdata/live/load-balancer.yaml"
 
 # OpenStack keypair
 #   Get valid options with 'openstack keypair list'

@@ -113,6 +113,22 @@ This allows us to retrieve a previous state if needed. To get the list of state 
 aws-sd4h-my-profile s3api list-object-versions --bucket fried_tofu --prefix <cluster_name variable value>
 ```
 
+### Cloud-Init templates
+
+The VM provisioning relies on Cloud-Init for all nodes, ready to use templates can be found at `userdata/tpl/*.yaml`.
+
+Files under `userdata/live/` are ignored by Git by default, in order to avoid leaking sensitive data to source control.
+
+Create the files you will be using from the templates:
+```bash
+mkdir -p userdata/live
+cp userdata/tpl/* userdata/live
+
+# Edit the files to include your SSH keys             (REQUIRED)
+# Edit the files to include extra packages you need   (OPTIONAL)
+# Edit the files to include extra users               (OPTIONAL)
+```
+
 ### Configuration variables
 
 The `terraform.tfvars` file is auto discovered by OpenTofu when running `plan` and `apply`, 
@@ -165,11 +181,11 @@ control_plane_count = 3 # Default (3 or more for HA)
 worker_count        = 3 # Default (3 or more for HA)
 
 # Cloud-Init (User data)
-bastion_user_data_path = "userdata/bastion.yaml"  # Make sure to add your public SSH key in the Bastion cloud-init !!!
-mgmt_user_data_path    = "userdata/mgmt.yaml"
-cp_user_data_path      = "userdata/k8s-master.yaml"
-worker_user_data_path  = "userdata/k8s-worker.yaml"
-lb_user_data_path      = "userdata/load-balancer.yaml"
+bastion_user_data_path = "userdata/live/bastion.yaml"  # Make sure to add your public SSH key in the Bastion cloud-init !!!
+mgmt_user_data_path    = "userdata/live/mgmt.yaml"
+cp_user_data_path      = "userdata/live/k8s-master.yaml"
+worker_user_data_path  = "userdata/live/k8s-worker.yaml"
+lb_user_data_path      = "userdata/live/load-balancer.yaml"
 
 # OpenStack keypair
 #   Get valid options with 'openstack keypair list'

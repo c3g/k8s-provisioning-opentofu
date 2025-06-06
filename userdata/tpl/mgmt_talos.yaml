@@ -6,9 +6,7 @@ users:
     sudo: ALL=(ALL) NOPASSWD:ALL
     # Good to include some keys for the admin so we can retrieve the instance if something goes wrong with bastion
     ssh_authorized_keys: [
-      ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKNh8QVIYdqgnPK1jS2slJ7Xmcz3eEfqGRaSKqKK3gSF poq@frugal,
-      ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGxum9RRpQUxPaSL5FJP/bXM0P4vs23EuMkJoXvA5TV6 victor.rocheleau@mcgill.ca,
-      ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPjXNvynxihSsSiEQYK2wfSNWA6SdUFFylOx1CZUPXCu victor.rocheleau@mcgill.ca
+      # PUT YOUR SSH KEYS HERE
     ]
   - name: bastion
     groups: adm, wheel, systemd-journal

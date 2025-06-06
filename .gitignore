@@ -35,3 +35,10 @@ override.tf.json
 # Ignore CLI configuration files
 .terraformrc
 terraform.rc
+
+# Ignore live Cloud-Init files that may contain sensitive data
+userdata/live/
+
+# OR only ignore K8S control-plane and worker Cloud-Init live files
+# userdata/live/k8s-master.yaml
+# userdata/live/k8s-worker.yaml

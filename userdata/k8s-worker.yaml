@@ -1,2 +1,0 @@
-disable_ec2_metadata: false
-timezone: "UTC-5" # EST
