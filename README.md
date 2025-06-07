@@ -63,7 +63,8 @@ This state management strategy is more robust, especially when working in teams:
 > Amazon S3, Azure Blob Storage, Google Cloud Storage, Alibaba Cloud OSS, and more.
 
 For usage on SD4H, the most convenient path is to use the provided S3 API!
-Before applying this module, make sure you have the following ready:
+> [!IMPORTANT]
+> Before applying this module, make sure you have the following ready:
 1. Your OpenStack project has a private bucket dedicated to OpenTofu, **with bucket versioning enabled**
    1. Bucket versioning must be enabled with the S3 API, Swift will not work. (instructions bellow)
 2. You have S3 credentials on that project

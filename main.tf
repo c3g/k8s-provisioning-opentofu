@@ -35,196 +35,13 @@ provider "openstack" {
   auth_url = "https://juno.calculquebec.ca:5000"
 }
 
-# Cloudflare provider config and variables
-variable "cloudflare_api_token" {
-  description = "API token for cloudflare DNS zone"
-  type        = string
-  sensitive   = true
-}
-
-
-variable "clouflare_zone_id" {
-  description = "DNS zone ID, get from Cloudflare dashboard"
-  type        = string
-  default     = "ef0aaf0dd92b0faf0064b84a7da2b67b" # SD4H zone ID
-}
-
 provider "cloudflare" {
   api_token = var.cloudflare_api_token
 }
 
-#############################
-######### VARIABLES #########
-#############################
-
-# Cluster name
-variable "cluster_name" {
-  description = "Resource name for the K8S cluster, will be the prefix to all OpenStack resources created."
-  type        = string
-}
-
-variable "bastion_name" {
-  description = "Friendly name for the Bastion instance."
-  type        = string
-}
-
-variable "bastion_admin_user_name" {
-  description = "User name for the initial admin account that will be created"
-  type        = string
-}
-
-variable "bastion_admin_user_pub_key" {
-  description = "Public SSH key for the admin user"
-  type        = string
-}
-
-# Storage backend
-# See https://opentofu.org/docs/language/settings/backends/s3/
-variable "s3_endpoint" {
-  description = "S3 endpoint to use for backend storage."
-  type        = string
-  default     = "https://objets.juno.calculquebec.ca"
-}
-
-# Openstack keypair to use
-variable "keypair" {
-  description = "SSH keypair name"
-  type        = string
-}
-
-# Image variables
-variable "bastion_image" {
-  description = "Image to use for the Bastion VM"
-  type        = string
-}
-
-variable "mgmt_image" {
-  description = "Image to use for the management VM"
-  type        = string
-}
-
-variable "control_plane_image" {
-  description = "Image to use for the control-plane VMs"
-  type        = string
-}
-
-variable "worker_image" {
-  description = "Image to use for the worker VMs"
-  type        = string
-}
-
-# Flavor variables
-variable "bastion_flavor" {
-  description = "Bastion flavor"
-  type        = string
-}
-
-variable "mgmt_flavor" {
-  description = "Management flavor"
-  type        = string
-}
-
-variable "control_plane_flavor" {
-  description = "K8S control plane flavor"
-  type        = string
-}
-
-variable "worker_flavor" {
-  description = "K8S worker flavor"
-  type        = string
-}
-
-# K8S nodes counts
-variable "control_plane_count" {
-  description = "The number of control plane nodes to create"
-  type        = number
-  default     = 3
-}
-
-variable "worker_count" {
-  description = "The number of worker nodes to create"
-  type        = number
-  default     = 3
-}
-
-# Volume sizes & types
-variable "bastion_volume_size" {
-  description = "Bastion volume size in GB"
-  type        = number
-}
-
-variable "mgmt_volume_size" {
-  description = "Management volume size in GB"
-  type        = number
-}
-
-variable "control_plane_volume_size" {
-  description = "K8S control Plane volume size in GB"
-  type        = number
-}
-
-variable "worker_volume_size" {
-  description = "K8S worker node volume size in GB"
-  type        = number
-}
-
-variable "bastion_volume_type" {
-  description = "Bastion volume type"
-  type        = string
-}
-
-variable "mgmt_volume_type" {
-  description = "Management volume type"
-  type        = string
-}
-
-variable "control_plane_volume_type" {
-  description = "K8S control Plane volume type"
-  type        = string
-}
-
-variable "worker_volume_type" {
-  description = "K8S worker volume type"
-  type        = string
-}
-
-variable "public_network_id" {
-  description = "ID of the public network"
-  type        = string
-}
-
-variable "router_name" {
-  description = "OpenStack router name"
-  type        = string
-}
-
-# User data
-variable "bastion_user_data_path" {
-  description = "Path to the Cloud-Init file for Bastion setup"
-  type        = string
-}
-
-variable "mgmt_user_data_path" {
-  description = "Path to the Cloud-Init file for MGMT VM"
-  type        = string
-}
-
-variable "cp_user_data_path" {
-  description = "(Optional) Path to the Cloud-Init file for Control-Plane VMs"
-  type        = string
-}
-
-variable "worker_user_data_path" {
-  description = "(Optional) Path to the Cloud-Init file for Control-Plane VMs"
-  type        = string
-}
-
-variable "lb_user_data_path" {
-  description = "Path to the Cloud-Init file for the load balancer(s) VM(s)"
-  type        = string
-}
-
-######### NETWORKING
+######################################
+############# NETWORKING #############
+######################################
 
 # Bastion + Management subnet
 resource "openstack_networking_network_v2" "mgmt_net" {
@@ -274,6 +91,7 @@ resource "openstack_networking_floatingip_associate_v2" "bastion_fip_assoc" {
 resource "openstack_networking_floatingip_associate_v2" "lb_fip_assoc" {
   floating_ip = openstack_networking_floatingip_v2.lb_fip.address
   port_id     = openstack_networking_port_v2.lb_port.id
+  depends_on = [ openstack_networking_port_v2.lb_port ]
 }
 
 resource "cloudflare_dns_record" "bastion_dns" {
@@ -318,6 +136,7 @@ resource "openstack_networking_router_interface_v2" "cp_router_interface" {
 # Worker subnet
 resource "openstack_networking_network_v2" "worker_net" {
   name = "${var.cluster_name}-worker-net"
+  admin_state_up = "true"
 }
 
 resource "openstack_networking_subnet_v2" "worker_subnet" {
@@ -325,6 +144,11 @@ resource "openstack_networking_subnet_v2" "worker_subnet" {
   network_id = openstack_networking_network_v2.worker_net.id
   cidr       = "172.16.3.0/24"
   ip_version = 4
+}
+
+resource "openstack_networking_router_interface_v2" "worker_router_interface" {
+  router_id = data.openstack_networking_router_v2.router.id
+  subnet_id = openstack_networking_subnet_v2.worker_subnet.id
 }
 
 # Custom load-balancer networking (TODO: replace with Openstack LBaaS once available)
@@ -353,22 +177,15 @@ resource "openstack_networking_port_v2" "lb_port" {
   }
 }
 
-######### SECURITY GROUPS
+###################################
+######### SECURITY GROUPS #########
+###################################
+# See ./security-groups.tf for the rules
 
 # Bastion: allow SSH from anywhere
 resource "openstack_networking_secgroup_v2" "bastion_sg" {
   name        = "${var.cluster_name}-bastion-sg"
   description = "Allow SSH"
-}
-
-resource "openstack_networking_secgroup_rule_v2" "bastion_ssh" {
-  direction         = "ingress"
-  ethertype         = "IPv4"
-  protocol          = "tcp"
-  port_range_min    = 22
-  port_range_max    = 22
-  remote_ip_prefix  = "0.0.0.0/0"
-  security_group_id = openstack_networking_secgroup_v2.bastion_sg.id
 }
 
 # Management: allow SSH only from bastion
@@ -377,30 +194,10 @@ resource "openstack_networking_secgroup_v2" "mgmt_sg" {
   description = "Allow SSH from bastion"
 }
 
-resource "openstack_networking_secgroup_rule_v2" "mgmt_ssh" {
-  direction         = "ingress"
-  ethertype         = "IPv4"
-  protocol          = "tcp"
-  port_range_min    = 22
-  port_range_max    = 22
-  remote_group_id   = openstack_networking_secgroup_v2.bastion_sg.id
-  security_group_id = openstack_networking_secgroup_v2.mgmt_sg.id
-}
-
 # Control plane: allow SSH from mgmt
 resource "openstack_networking_secgroup_v2" "cp_sg" {
   name        = "${var.cluster_name}-cp-sg"
   description = "Allow SSH and TCP from mgmt"
-}
-
-resource "openstack_networking_secgroup_rule_v2" "cp_ssh" {
-  direction         = "ingress"
-  ethertype         = "IPv4"
-  protocol          = "tcp"
-  port_range_min    = 22
-  port_range_max    = 22
-  remote_group_id   = openstack_networking_secgroup_v2.mgmt_sg.id
-  security_group_id = openstack_networking_secgroup_v2.cp_sg.id
 }
 
 # Worker: allow SSH from mgmt
@@ -409,102 +206,15 @@ resource "openstack_networking_secgroup_v2" "worker_sg" {
   description = "Allow SSH and TCP from mgmt"
 }
 
-resource "openstack_networking_secgroup_rule_v2" "worker_ssh" {
-  direction         = "ingress"
-  ethertype         = "IPv4"
-  protocol          = "tcp"
-  port_range_min    = 22
-  port_range_max    = 22
-  remote_group_id   = openstack_networking_secgroup_v2.mgmt_sg.id
-  security_group_id = openstack_networking_secgroup_v2.worker_sg.id
-}
-
-# Control plane: allow all TCP from mgmt (for kubespray and k8s management)
-resource "openstack_networking_secgroup_rule_v2" "cp_from_mgmt" {
-  direction = "ingress"
-  ethertype = "IPv4"
-  protocol  = "tcp"
-  # port_range_min    = 0
-  # port_range_max    = 0
-  remote_group_id   = openstack_networking_secgroup_v2.mgmt_sg.id
-  security_group_id = openstack_networking_secgroup_v2.cp_sg.id
-}
-
-resource "openstack_networking_secgroup_rule_v2" "cp_from_mgmt_talos" {
-  direction = "ingress"
-  ethertype = "IPv4"
-  protocol  = "tcp"
-  port_range_min    = 50000
-  port_range_max    = 50000
-  remote_group_id   = openstack_networking_secgroup_v2.mgmt_sg.id
-  security_group_id = openstack_networking_secgroup_v2.cp_sg.id
-}
-
-# Allow all trafic between Control-plane nodes and worker nodes
-resource "openstack_networking_secgroup_rule_v2" "cp_to_worker_all" {
-  direction         = "ingress"
-  ethertype         = "IPv4"
-  protocol          = null
-  remote_group_id   = openstack_networking_secgroup_v2.cp_sg.id
-  security_group_id = openstack_networking_secgroup_v2.worker_sg.id
-}
-
-resource "openstack_networking_secgroup_rule_v2" "worker_to_cp_all" {
-  direction         = "ingress"
-  ethertype         = "IPv4"
-  protocol          = null
-  remote_group_id   = openstack_networking_secgroup_v2.worker_sg.id
-  security_group_id = openstack_networking_secgroup_v2.cp_sg.id
-}
-
-# Worker: allow all TCP from mgmt (for kubespray and k8s management)
-resource "openstack_networking_secgroup_rule_v2" "worker_from_mgmt" {
-  direction = "ingress"
-  ethertype = "IPv4"
-  protocol  = "tcp"
-  port_range_min    = 0
-  port_range_max    = 0
-  remote_group_id   = openstack_networking_secgroup_v2.mgmt_sg.id
-  security_group_id = openstack_networking_secgroup_v2.worker_sg.id
-}
-
 # Load Balancer
 resource "openstack_networking_secgroup_v2" "lb_sg" {
   name        = "${var.cluster_name}-lb-sg"
   description = "Load Balancer security group"
 }
 
-resource "openstack_networking_secgroup_rule_v2" "lb_k8s_api" {
-  direction         = "ingress"
-  ethertype         = "IPv4"
-  protocol          = "tcp"
-  port_range_min    = 6443
-  port_range_max    = 6443
-  remote_ip_prefix  = "0.0.0.0/0"
-  security_group_id = openstack_networking_secgroup_v2.lb_sg.id
-}
-
-resource "openstack_networking_secgroup_rule_v2" "lb_ssh_from_bastion" {
-  direction         = "ingress"
-  ethertype         = "IPv4"
-  protocol          = "tcp"
-  port_range_min    = 22
-  port_range_max    = 22
-  remote_group_id   = openstack_networking_secgroup_v2.bastion_sg.id
-  security_group_id = openstack_networking_secgroup_v2.lb_sg.id
-}
-
-resource "openstack_networking_secgroup_rule_v2" "cp_from_lb" {
-  direction         = "ingress"
-  ethertype         = "IPv4"
-  protocol          = "tcp"
-  port_range_min    = 6443
-  port_range_max    = 6443
-  remote_group_id   = openstack_networking_secgroup_v2.lb_sg.id
-  security_group_id = openstack_networking_secgroup_v2.cp_sg.id
-}
-
-######### COMPUTE INSTANCES
+#####################################
+######### COMPUTE INSTANCES #########
+#####################################
 
 # Bastion
 resource "openstack_blockstorage_volume_v3" "bastion_home" {
