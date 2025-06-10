@@ -1,5 +1,7 @@
 # Kubernetes provisioning template for OpenStack with OpenTofu
 
+![Infrastructure diagram](./docs/infra.png)
+
 Use this repository as a template to provision the resources needed for a secure high-availability K8S cluster:
 - Bastion VM
   - **Only instance to allow SSH from outside**
