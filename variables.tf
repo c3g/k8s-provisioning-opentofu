@@ -217,4 +217,3 @@ variable "lb_net_cidr" {
   description = "CIDR for the Worker network"  
   type = string
 }
-# "172.16.2.0/24"
