@@ -1,0 +1,61 @@
+# Cluster name, will be the prefix to all OpenStack resources created.
+# Use a lower case hyphen-separated name for consistency
+cluster_name = ""
+
+cloudflare_api_token = ""
+
+# Image variables, always use the ID.
+#   Get options with 'openstack image list'
+bastion_image       = ""
+mgmt_image          = ""
+control_plane_image = ""
+worker_image        = ""
+
+# Flavor variables, always use the ID.
+#   Get options with 'openstack flavor list'
+bastion_flavor       = ""
+mgmt_flavor          = ""
+control_plane_flavor = ""
+worker_flavor        = ""
+
+# Volume sizes in GB.
+bastion_volume_size       = 20
+mgmt_volume_size          = 20
+control_plane_volume_size = 50
+worker_volume_size        = 50
+
+# Volume types: volumes-ssd OR volumes-ec
+bastion_volume_type       = "volumes-ssd"
+mgmt_volume_type          = "volumes-ssd"
+control_plane_volume_type = "volumes-ssd"
+worker_volume_type        = "volumes-ssd"
+
+# Instance counts
+control_plane_count = 3 # Default (3 or more for HA)
+worker_count        = 3 # Default (3 or more for HA)
+
+# Cloud-Init (User data)
+bastion_user_data_path = "userdata/bastion.yaml"
+mgmt_user_data_path    = "userdata/mgmt.yaml"
+cp_user_data_path      = "userdata/k8s-master.yaml"
+worker_user_data_path  = "userdata/k8s-worker.yaml"
+lb_user_data_path      = "userdata/load-balancer.yaml"
+
+# OpenStack keypair
+#   Get valid options with 'openstack keypair list'
+keypair = ""
+
+# Networking
+public_network_id = ""
+router_name       = ""
+
+# Bastion
+bastion_admin_user_name    = "" # ADMIN USER FOR BASTION
+bastion_admin_user_pub_key = "" # PUBKEY FOR BASTION ADMIN USER
+bastion_name               = "" # BASTION ALIAS TO USE 
+
+# CIDRs
+mgmt_net_cidr   = "" # Management network CIDR
+cp_net_cidr     = "" # Control-Plane network CIDR
+worker_net_cidr = "" # Worker network CIDR
+lb_net_cidr     = "" # Load-Balancer network CIDR

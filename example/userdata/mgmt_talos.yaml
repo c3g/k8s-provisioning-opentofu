@@ -1,0 +1,24 @@
+#cloud-config
+users:
+  - name: admin
+    groups: adm, wheel, systemd-journal
+    selinux_user: unconfined_u
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    # Good to include some keys for the admin so we can retrieve the instance if something goes wrong with bastion
+    ssh_authorized_keys: [
+      # PUT YOUR SSH KEYS HERE
+    ]
+  - name: bastion
+    groups: adm, wheel, systemd-journal
+    selinux_user: unconfined_u
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys: [
+      # ADD BASTION GROUP'S EGRESS KEY HERE!!!
+    ]
+
+runcmd:
+  # Install talosctl
+  - curl -sL https://talos.dev/install | sh
+
+disable_ec2_metadata: false
+timezone: "UTC-5" # EST
