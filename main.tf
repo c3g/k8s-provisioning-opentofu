@@ -14,6 +14,8 @@ terraform {
       version = "5.5.0"
     }
   }
+  # Provided S3 config example
+  # Only your root backend config will be used when using this module
   backend "s3" {
     bucket = var.s3_bucket
     key    = var.cluster_name

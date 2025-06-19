@@ -46,3 +46,12 @@ keypair = "YOUR KEYPAIR NAME"
 # Networking
 public_network_id = "PUBLIC NETWORK UUID"
 router_name       = "ROUTER NAME"
+
+bastion_admin_user_name    = "ADMIN USER FOR BASTION"
+bastion_admin_user_pub_key = "PUBKEY FOR BASTION ADMIN USER"
+bastion_name               = "BASTION ALIAS TO USE "
+
+mgmt_net_cidr   = "172.16.1.0/24"
+cp_net_cidr     = "172.16.2.0/24"
+worker_net_cidr = "172.16.3.0/24"
+lb_net_cidr     = "172.16.4.0/24"

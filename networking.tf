@@ -45,6 +45,7 @@ resource "openstack_networking_floatingip_v2" "lb_fip" {
 resource "openstack_networking_floatingip_associate_v2" "bastion_fip_assoc" {
   floating_ip = openstack_networking_floatingip_v2.bastion_fip.address
   port_id     = openstack_networking_port_v2.bastion_port.id
+  depends_on = [ openstack_networking_port_v2.bastion_port ]
 }
 
 resource "openstack_networking_floatingip_associate_v2" "lb_fip_assoc" {
