@@ -153,16 +153,16 @@ resource "openstack_compute_instance_v2" "worker" {
 }
 
 resource "openstack_compute_instance_v2" "load_balancer" {
-  # count           = 1 # TODO: param
+  # count           = 1 # TODO: make this parametrisable ?
   name            = "${var.cluster_name}-lb"
-  flavor_id       = var.bastion_flavor # TODO: own flavor var
+  flavor_id       = var.lb_flavor
   key_pair        = var.keypair
   security_groups = [openstack_networking_secgroup_v2.lb_sg.name]
   network {
     port = openstack_networking_port_v2.lb_port.id
   }
   block_device {
-    uuid                  = var.bastion_image # TODO: own image var
+    uuid                  = var.lb_image
     source_type           = "image"
     destination_type      = "volume"
     volume_type           = var.bastion_volume_type
@@ -175,10 +175,4 @@ resource "openstack_compute_instance_v2" "load_balancer" {
     ip_addrs  = [for i in range(var.control_plane_count) : openstack_compute_instance_v2.control_plane[i].access_ip_v4]
   })
   depends_on = [openstack_networking_subnet_v2.lb_subnet]
-}
-
-output "bastion_alias" {
-  description = "Bastion SSH alias."
-  value       = "alias ${var.bastion_name}=ssh ${var.bastion_admin_user_name}@${cloudflare_dns_record.bastion_dns.name} -t -- "
-  depends_on  = [cloudflare_dns_record.bastion_dns]
 }

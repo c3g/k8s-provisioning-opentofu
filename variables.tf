@@ -13,14 +13,14 @@ variable "s3_endpoint" {
 
 variable "s3_bucket" {
   description = "S3 bucket to store infra state"
-  type = string
-  default = "fried_tofu"
+  type        = string
+  default     = "fried_tofu"
 }
 
 variable "s3_region" {
   description = "S3 region to use for backend storage"
-  type = string
-  default = "us-east-1"
+  type        = string
+  default     = "us-east-1"
 }
 ###### Storage backend END ######
 
@@ -85,6 +85,11 @@ variable "worker_image" {
   type        = string
 }
 
+variable "lb_image" {
+  description = "Image to use for the HAProxy load-balancer instance"
+  type        = string
+}
+
 # Flavor variables
 variable "bastion_flavor" {
   description = "Bastion flavor"
@@ -103,6 +108,11 @@ variable "control_plane_flavor" {
 
 variable "worker_flavor" {
   description = "K8S worker flavor"
+  type        = string
+}
+
+variable "lb_flavor" {
+  description = "Compute flavor for the HAProxy LB"
   type        = string
 }
 
@@ -199,21 +209,21 @@ variable "lb_user_data_path" {
 #### Networking
 
 variable "mgmt_net_cidr" {
-  description = "CIDR for the MGMT network"  
-  type = string
+  description = "CIDR for the MGMT network"
+  type        = string
 }
 
 variable "cp_net_cidr" {
-  description = "CIDR for the Control-Plane network"  
-  type = string
+  description = "CIDR for the Control-Plane network"
+  type        = string
 }
 
 variable "worker_net_cidr" {
-  description = "CIDR for the Worker network"  
-  type = string
+  description = "CIDR for the Worker network"
+  type        = string
 }
 
 variable "lb_net_cidr" {
-  description = "CIDR for the Worker network"  
-  type = string
+  description = "CIDR for the Worker network"
+  type        = string
 }
