@@ -2,6 +2,28 @@
 ######### VARIABLES #########
 #############################
 
+###### Storage backend BEGIN ######
+# See https://opentofu.org/docs/language/settings/backends/s3/
+
+variable "s3_endpoint" {
+  description = "S3 endpoint to use for backend storage."
+  type        = string
+  default     = "https://objets.juno.calculquebec.ca"
+}
+
+variable "s3_bucket" {
+  description = "S3 bucket to store infra state"
+  type = string
+  default = "fried_tofu"
+}
+
+variable "s3_region" {
+  description = "S3 region to use for backend storage"
+  type = string
+  default = "us-east-1"
+}
+###### Storage backend END ######
+
 # Cloudflare provider config and variables
 variable "cloudflare_api_token" {
   description = "API token for cloudflare DNS zone"
@@ -34,14 +56,6 @@ variable "bastion_admin_user_name" {
 variable "bastion_admin_user_pub_key" {
   description = "Public SSH key for the admin user"
   type        = string
-}
-
-# Storage backend
-# See https://opentofu.org/docs/language/settings/backends/s3/
-variable "s3_endpoint" {
-  description = "S3 endpoint to use for backend storage."
-  type        = string
-  default     = "https://objets.juno.calculquebec.ca"
 }
 
 # Openstack keypair to use
@@ -181,3 +195,26 @@ variable "lb_user_data_path" {
   description = "Path to the Cloud-Init file for the load balancer(s) VM(s)"
   type        = string
 }
+
+#### Networking
+
+variable "mgmt_net_cidr" {
+  description = "CIDR for the MGMT network"  
+  type = string
+}
+
+variable "cp_net_cidr" {
+  description = "CIDR for the Control-Plane network"  
+  type = string
+}
+
+variable "worker_net_cidr" {
+  description = "CIDR for the Worker network"  
+  type = string
+}
+
+variable "lb_net_cidr" {
+  description = "CIDR for the Worker network"  
+  type = string
+}
+# "172.16.2.0/24"

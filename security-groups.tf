@@ -1,6 +1,44 @@
-#########################################
-############# BASTION RULES #############
-#########################################
+###################################
+######### SECURITY GROUPS #########
+###################################
+
+# Bastion: allow SSH from anywhere
+resource "openstack_networking_secgroup_v2" "bastion_sg" {
+  name        = "${var.cluster_name}-bastion-sg"
+  description = "Allow SSH"
+}
+
+# Management: allow SSH only from bastion
+resource "openstack_networking_secgroup_v2" "mgmt_sg" {
+  name        = "${var.cluster_name}-mgmt-sg"
+  description = "Allow SSH from bastion"
+}
+
+# Control plane: allow SSH from mgmt
+resource "openstack_networking_secgroup_v2" "cp_sg" {
+  name        = "${var.cluster_name}-cp-sg"
+  description = "Allow SSH and TCP from mgmt"
+}
+
+# Worker: allow SSH from mgmt
+resource "openstack_networking_secgroup_v2" "worker_sg" {
+  name        = "${var.cluster_name}-worker-sg"
+  description = "Allow SSH and TCP from mgmt"
+}
+
+# Load Balancer
+resource "openstack_networking_secgroup_v2" "lb_sg" {
+  name        = "${var.cluster_name}-lb-sg"
+  description = "Load Balancer security group"
+}
+
+########################################
+############ SECGROUP RULES ############
+########################################
+
+###############
+### BASTION ###
+###############
 
 resource "openstack_networking_secgroup_rule_v2" "bastion_ssh" {
   direction         = "ingress"
@@ -32,9 +70,9 @@ resource "openstack_networking_secgroup_rule_v2" "lb_ssh_from_bastion" {
   security_group_id = openstack_networking_secgroup_v2.lb_sg.id
 }
 
-#################################################
-############# CONTROL PLANE RULES ###############
-#################################################
+###########################
+### CONTROL PLANE RULES ###
+###########################
 
 # SSH from mgmt
 resource "openstack_networking_secgroup_rule_v2" "cp_ssh" {
@@ -175,9 +213,9 @@ resource "openstack_networking_secgroup_rule_v2" "worker_to_cp_all" {
 }
 
 
-#################################################
-############# WORKER SECGROUP RULES #############
-#################################################
+#############################
+### WORKER SECGROUP RULES ###
+#############################
 
 # SSH from mgmt
 resource "openstack_networking_secgroup_rule_v2" "worker_ssh" {
@@ -239,9 +277,9 @@ resource "openstack_networking_secgroup_rule_v2" "worker_nodeport_from_cp" {
   security_group_id = openstack_networking_secgroup_v2.worker_sg.id
 }
 
-#####################################################
-################### LOAD BALANCER ###################
-#####################################################
+#####################
+### LOAD BALANCER ###
+#####################
 
 # Kubernetes API from anywhere (or restrict as needed)
 resource "openstack_networking_secgroup_rule_v2" "lb_k8s_api" {
@@ -254,9 +292,9 @@ resource "openstack_networking_secgroup_rule_v2" "lb_k8s_api" {
   security_group_id = openstack_networking_secgroup_v2.lb_sg.id
 }
 
-################################################
-################## EGRESS ALL ##################
-################################################
+##################
+### EGRESS ALL ###
+##################
 
 # Should already be enabled by default, uncomment otherwise
 
