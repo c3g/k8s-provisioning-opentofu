@@ -32,6 +32,32 @@ resource "openstack_networking_port_v2" "bastion_port" {
   }
 }
 
+# Custom load-balancer networking (TODO: replace with Openstack LBaaS once available)
+resource "openstack_networking_network_v2" "lb_net" {
+  name           = "${var.cluster_name}-lb-net"
+  admin_state_up = "true"
+}
+
+resource "openstack_networking_subnet_v2" "lb_subnet" {
+  name       = "${var.cluster_name}-lb-subnet"
+  network_id = openstack_networking_network_v2.lb_net.id
+  cidr       = var.lb_net_cidr
+  ip_version = 4
+}
+
+resource "openstack_networking_router_interface_v2" "lb_router_interface" {
+  router_id = data.openstack_networking_router_v2.router.id
+  subnet_id = openstack_networking_subnet_v2.lb_subnet.id
+}
+
+resource "openstack_networking_port_v2" "lb_port" {
+  network_id         = openstack_networking_network_v2.lb_net.id
+  security_group_ids = [openstack_networking_secgroup_v2.lb_sg.id]
+  fixed_ip {
+    subnet_id = openstack_networking_subnet_v2.lb_subnet.id
+  }
+}
+
 ### FLOATING IPs AND DNS RECORDS
 
 resource "openstack_networking_floatingip_v2" "bastion_fip" {
@@ -111,28 +137,3 @@ resource "openstack_networking_router_interface_v2" "worker_router_interface" {
   subnet_id = openstack_networking_subnet_v2.worker_subnet.id
 }
 
-# Custom load-balancer networking (TODO: replace with Openstack LBaaS once available)
-resource "openstack_networking_network_v2" "lb_net" {
-  name           = "${var.cluster_name}-lb-net"
-  admin_state_up = "true"
-}
-
-resource "openstack_networking_subnet_v2" "lb_subnet" {
-  name       = "${var.cluster_name}-lb-subnet"
-  network_id = openstack_networking_network_v2.lb_net.id
-  cidr       = var.lb_net_cidr
-  ip_version = 4
-}
-
-resource "openstack_networking_router_interface_v2" "lb_router_interface" {
-  router_id = data.openstack_networking_router_v2.router.id
-  subnet_id = openstack_networking_subnet_v2.lb_subnet.id
-}
-
-resource "openstack_networking_port_v2" "lb_port" {
-  network_id         = openstack_networking_network_v2.lb_net.id
-  security_group_ids = [openstack_networking_secgroup_v2.lb_sg.id]
-  fixed_ip {
-    subnet_id = openstack_networking_subnet_v2.lb_subnet.id
-  }
-}
