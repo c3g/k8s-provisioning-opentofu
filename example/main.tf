@@ -13,8 +13,7 @@ terraform {
 }
 
 module "k8s_cluster" {
-  source = "git@github.com:c3g/k8s-provisioning-opentofu.git//?ref=main"
-  #   version = "0.1.0"   TODO: once tagged
+  source = "git@github.com:c3g/k8s-provisioning-opentofu.git//?ref=v1.0.0"
   # General 
   cluster_name         = var.cluster_name
   cloudflare_api_token = var.cloudflare_api_token
